@@ -1,5 +1,6 @@
 package com.shemiji.emogibattery.ui.viewmodel.content
 
+import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shemiji.emogibattery.data.model.BatteryEmoji
@@ -27,6 +28,11 @@ data class BatteryCustomizationUiState(
     val selectedToolbarId: String? = null,
     val isToolbarEnabled: Boolean = false,
     val isAccessibilityEnabled: Boolean = false,
+    val customToolbarHeight: Float = 34f,
+    val customToolbarLeftMargin: Float = 16f,
+    val customToolbarRightMargin: Float = 16f,
+    val customToolbarIconColor: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.White,
+    val customToolbarBackgroundColor: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color(0xFFF4D10F),
     val errorMessage: String? = null,
     val message: String? = null,
     val sourceMode: ContentSourceMode = ContentSourceMode.LOCAL_DRAWABLES,
@@ -54,7 +60,10 @@ class BatteryCustomizationViewModel @Inject constructor(
         _uiState.update { it.copy(isAccessibilityEnabled = overlayController.isAccessibilityServiceEnabled()) }
     }
 
-    fun refresh() = loadContent(refreshing = true)
+    fun refresh() {
+        checkAccessibility()
+        loadContent(refreshing = true)
+    }
 
     fun selectBattery(id: String) {
         _uiState.update { it.copy(selectedBatteryId = id, message = null) }
@@ -64,22 +73,111 @@ class BatteryCustomizationViewModel @Inject constructor(
         _uiState.update { it.copy(selectedToolbarId = id, message = null) }
     }
 
-    fun enableToolbar() {
+    fun enableToolbar(
+        customHeight: Float = 34f,
+        customLeftMargin: Float = 16f,
+        customRightMargin: Float = 16f,
+        customIconColor: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.White,
+        customBackgroundColor: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color(0xFFF4D10F),
+    ) {
         val state = _uiState.value
         val battery = state.batteryEmojis.firstOrNull { it.id == state.selectedBatteryId }
             ?: return showMessage("Select a battery emoji first")
         val toolbar = state.toolbarStyles.firstOrNull { it.id == state.selectedToolbarId }
-            ?: return showMessage("Select a toolbar style first")
+            ?: buildCustomToolbarStyle(customIconColor, customBackgroundColor)
 
         viewModelScope.launch {
-            overlayController.startBatteryToolbar(battery, toolbar)
+            val iconHex = colorToHex(customIconColor)
+            val backgroundHex = colorToHex(customBackgroundColor)
+            overlayController.startBatteryToolbar(
+                battery,
+                toolbar,
+                height = customHeight.toInt(),
+                leftMargin = customLeftMargin.toInt(),
+                rightMargin = customRightMargin.toInt(),
+                iconColor = iconHex,
+                backgroundColor = backgroundHex,
+            )
                 .onSuccess {
-                    preferences.setBatteryCustomization(battery.id, toolbar.id, enabled = true)
+                    preferences.setBatteryCustomization(
+                        battery.id,
+                        toolbar.id,
+                        enabled = true,
+                        height = customHeight.toInt(),
+                        leftMargin = customLeftMargin.toInt(),
+                        rightMargin = customRightMargin.toInt(),
+                        iconColor = iconHex,
+                        backgroundColor = backgroundHex,
+                    )
                     showMessage("Battery toolbar enabled")
                 }
                 .onFailure { throwable ->
                     showMessage(throwable.message ?: "Unable to enable the battery toolbar")
                 }
+        }
+    }
+
+    fun applyCustomToolbarSettings(
+        customHeight: Float,
+        customLeftMargin: Float,
+        customRightMargin: Float,
+        customIconColor: androidx.compose.ui.graphics.Color,
+        customBackgroundColor: androidx.compose.ui.graphics.Color,
+    ) {
+        val iconHex = colorToHex(customIconColor)
+        val backgroundHex = colorToHex(customBackgroundColor)
+
+        viewModelScope.launch {
+            preferences.setToolbarAppearance(
+                height = customHeight.toInt(),
+                leftMargin = customLeftMargin.toInt(),
+                rightMargin = customRightMargin.toInt(),
+                iconColor = iconHex,
+                backgroundColor = backgroundHex,
+            )
+
+            val state = _uiState.value
+            if (state.isToolbarEnabled) {
+                val battery = state.batteryEmojis.firstOrNull { it.id == state.selectedBatteryId }
+                    ?: return@launch showMessage("Select a battery emoji first")
+                val toolbar = state.toolbarStyles.firstOrNull { it.id == state.selectedToolbarId }
+                    ?: buildCustomToolbarStyle(customIconColor, customBackgroundColor)
+
+                overlayController.startBatteryToolbar(
+                    battery,
+                    toolbar,
+                    height = customHeight.toInt(),
+                    leftMargin = customLeftMargin.toInt(),
+                    rightMargin = customRightMargin.toInt(),
+                    iconColor = iconHex,
+                    backgroundColor = backgroundHex,
+                ).onSuccess {
+                    _uiState.update {
+                        it.copy(
+                            customToolbarHeight = customHeight,
+                            customToolbarLeftMargin = customLeftMargin,
+                            customToolbarRightMargin = customRightMargin,
+                            customToolbarIconColor = customIconColor,
+                            customToolbarBackgroundColor = customBackgroundColor,
+                        )
+                    }
+                    showMessage("Status bar settings applied")
+                }.onFailure { throwable ->
+                    showMessage(throwable.message ?: "Unable to update the toolbar")
+                }
+                return@launch
+            }
+
+            _uiState.update {
+                it.copy(
+                    customToolbarHeight = customHeight,
+                    customToolbarLeftMargin = customLeftMargin,
+                    customToolbarRightMargin = customRightMargin,
+                    customToolbarIconColor = customIconColor,
+                    customToolbarBackgroundColor = customBackgroundColor,
+                )
+            }
+            showMessage("Status bar settings saved")
         }
     }
 
@@ -158,6 +256,21 @@ class BatteryCustomizationViewModel @Inject constructor(
                         selectedBatteryId = selections.batteryEmojiId ?: it.selectedBatteryId,
                         selectedToolbarId = selections.toolbarStyleId ?: it.selectedToolbarId,
                         isToolbarEnabled = selections.batteryToolbarEnabled,
+                        customToolbarHeight = selections.toolbarHeight.toFloat().coerceIn(24f, 60f),
+                        customToolbarLeftMargin = selections.toolbarLeftMargin.toFloat().coerceIn(0f, 32f),
+                        customToolbarRightMargin = selections.toolbarRightMargin.toFloat().coerceIn(0f, 32f),
+                        customToolbarIconColor = selections.toolbarIconColor
+                            ?.let { colorString ->
+                                val parsed = android.graphics.Color.parseColor(colorString)
+                                androidx.compose.ui.graphics.Color(parsed)
+                            }
+                            ?: it.customToolbarIconColor,
+                        customToolbarBackgroundColor = selections.toolbarBackgroundColor
+                            ?.let { colorString ->
+                                val parsed = android.graphics.Color.parseColor(colorString)
+                                androidx.compose.ui.graphics.Color(parsed)
+                            }
+                            ?: it.customToolbarBackgroundColor,
                     )
                 }
             }
@@ -167,4 +280,21 @@ class BatteryCustomizationViewModel @Inject constructor(
     private fun showMessage(message: String) {
         _uiState.update { it.copy(message = message) }
     }
+
+    private fun colorToHex(color: androidx.compose.ui.graphics.Color): String {
+        val argb = color.toArgb()
+        val rgb = argb and 0x00FFFFFF
+        return String.format("#%06X", rgb)
+    }
+
+    private fun buildCustomToolbarStyle(
+        customIconColor: androidx.compose.ui.graphics.Color,
+        customBackgroundColor: androidx.compose.ui.graphics.Color,
+    ): ToolbarStyle = ToolbarStyle(
+        id = "custom_toolbar",
+        name = "Custom",
+        backgroundColor = colorToHex(customBackgroundColor),
+        contentColor = colorToHex(customIconColor),
+        accentColor = colorToHex(customIconColor),
+    )
 }

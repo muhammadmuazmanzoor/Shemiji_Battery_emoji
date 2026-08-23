@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -26,6 +27,11 @@ data class UserSelections(
     val shimejiCharacterId: String? = null,
     val batteryToolbarEnabled: Boolean = false,
     val shimejiEnabled: Boolean = false,
+    val toolbarHeight: Int = 34,
+    val toolbarLeftMargin: Int = 16,
+    val toolbarRightMargin: Int = 16,
+    val toolbarIconColor: String? = null,
+    val toolbarBackgroundColor: String? = null,
 )
 
 @Singleton
@@ -39,6 +45,11 @@ class SelectionPreferences @Inject constructor(
         val shimejiCharacterId = stringPreferencesKey("shimeji_character_id")
         val batteryToolbarEnabled = booleanPreferencesKey("battery_toolbar_enabled")
         val shimejiEnabled = booleanPreferencesKey("shimeji_enabled")
+        val toolbarHeight = intPreferencesKey("toolbar_height")
+        val toolbarLeftMargin = intPreferencesKey("toolbar_left_margin")
+        val toolbarRightMargin = intPreferencesKey("toolbar_right_margin")
+        val toolbarIconColor = stringPreferencesKey("toolbar_icon_color")
+        val toolbarBackgroundColor = stringPreferencesKey("toolbar_background_color")
     }
 
     val selections: Flow<UserSelections> = context.selectionDataStore.data
@@ -54,6 +65,11 @@ class SelectionPreferences @Inject constructor(
                 shimejiCharacterId = preferences[Keys.shimejiCharacterId],
                 batteryToolbarEnabled = preferences[Keys.batteryToolbarEnabled] ?: false,
                 shimejiEnabled = preferences[Keys.shimejiEnabled] ?: false,
+                toolbarHeight = preferences[Keys.toolbarHeight] ?: 34,
+                toolbarLeftMargin = preferences[Keys.toolbarLeftMargin] ?: 16,
+                toolbarRightMargin = preferences[Keys.toolbarRightMargin] ?: 16,
+                toolbarIconColor = preferences[Keys.toolbarIconColor],
+                toolbarBackgroundColor = preferences[Keys.toolbarBackgroundColor],
             )
         }
 
@@ -61,11 +77,37 @@ class SelectionPreferences @Inject constructor(
         batteryEmojiId: String,
         toolbarStyleId: String,
         enabled: Boolean,
+        height: Int = 34,
+        leftMargin: Int = 16,
+        rightMargin: Int = 16,
+        iconColor: String? = null,
+        backgroundColor: String? = null,
     ) {
         context.selectionDataStore.edit { preferences ->
             preferences[Keys.batteryEmojiId] = batteryEmojiId
             preferences[Keys.toolbarStyleId] = toolbarStyleId
             preferences[Keys.batteryToolbarEnabled] = enabled
+            preferences[Keys.toolbarHeight] = height
+            preferences[Keys.toolbarLeftMargin] = leftMargin
+            preferences[Keys.toolbarRightMargin] = rightMargin
+            iconColor?.let { preferences[Keys.toolbarIconColor] = it }
+            backgroundColor?.let { preferences[Keys.toolbarBackgroundColor] = it }
+        }
+    }
+
+    suspend fun setToolbarAppearance(
+        height: Int,
+        leftMargin: Int,
+        rightMargin: Int,
+        iconColor: String,
+        backgroundColor: String,
+    ) {
+        context.selectionDataStore.edit { preferences ->
+            preferences[Keys.toolbarHeight] = height
+            preferences[Keys.toolbarLeftMargin] = leftMargin
+            preferences[Keys.toolbarRightMargin] = rightMargin
+            preferences[Keys.toolbarIconColor] = iconColor
+            preferences[Keys.toolbarBackgroundColor] = backgroundColor
         }
     }
 

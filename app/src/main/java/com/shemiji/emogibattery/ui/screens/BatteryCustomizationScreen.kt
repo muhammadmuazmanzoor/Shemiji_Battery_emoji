@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -68,6 +70,25 @@ fun BatteryCustomizationScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     var showAccessibilityDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        viewModel.checkAccessibility()
+    }
+
+    var customHeight by remember { mutableStateOf(uiState.customToolbarHeight) }
+    var customLeftMargin by remember { mutableStateOf(uiState.customToolbarLeftMargin) }
+    var customRightMargin by remember { mutableStateOf(uiState.customToolbarRightMargin) }
+    var selectedIconColor by remember { mutableStateOf(uiState.customToolbarIconColor) }
+    var selectedBackgroundColor by remember { mutableStateOf(uiState.customToolbarBackgroundColor) }
+    var selectedBackgroundImage by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.customToolbarHeight, uiState.customToolbarLeftMargin, uiState.customToolbarRightMargin, uiState.customToolbarIconColor, uiState.customToolbarBackgroundColor) {
+        customHeight = uiState.customToolbarHeight
+        customLeftMargin = uiState.customToolbarLeftMargin
+        customRightMargin = uiState.customToolbarRightMargin
+        selectedIconColor = uiState.customToolbarIconColor
+        selectedBackgroundColor = uiState.customToolbarBackgroundColor
+    }
 
     val overlayPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
@@ -151,21 +172,12 @@ fun BatteryCustomizationScreen(
                                 emojiModel = uiState.batteryEmojis
                                     .firstOrNull { it.id == uiState.selectedBatteryId }
                                     ?.imageModel(),
-                                backgroundColor = uiState.toolbarStyles
-                                    .firstOrNull { it.id == uiState.selectedToolbarId }
-                                    ?.backgroundColor
-                                    ?.let { parseComposeColor(it) }
-                                    ?: Color(0xFF16182B),
-                                contentColor = uiState.toolbarStyles
-                                    .firstOrNull { it.id == uiState.selectedToolbarId }
-                                    ?.contentColor
-                                    ?.let { parseComposeColor(it) }
-                                    ?: Color.White,
-                                accentColor = uiState.toolbarStyles
-                                    .firstOrNull { it.id == uiState.selectedToolbarId }
-                                    ?.accentColor
-                                    ?.let { parseComposeColor(it) }
-                                    ?: Color(0xFF8B8FFF),
+                                backgroundColor = selectedBackgroundColor,
+                                contentColor = selectedIconColor,
+                                accentColor = selectedIconColor,
+                                height = customHeight,
+                                leftMargin = customLeftMargin,
+                                rightMargin = customRightMargin,
                             )
                         }
                     }
@@ -216,58 +228,59 @@ fun BatteryCustomizationScreen(
                     }
 
                     item {
-                        SectionTitle(
-                            title = "Choose toolbar style",
-                            subtitle = "Color values work the same for local and API content.",
+                        StatusBarCustomizationCard(
+                            height = customHeight,
+                            leftMargin = customLeftMargin,
+                            rightMargin = customRightMargin,
+                            iconColor = selectedIconColor,
+                            backgroundColor = selectedBackgroundColor,
+                            backgroundImageSelected = selectedBackgroundImage,
+                            onHeightChange = { customHeight = it },
+                            onLeftMarginChange = { customLeftMargin = it },
+                            onRightMarginChange = { customRightMargin = it },
+                            onIconColorSelected = { selectedIconColor = it },
+                            onBackgroundColorSelected = { selectedBackgroundColor = it },
+                            onBackgroundImageClick = { selectedBackgroundImage = !selectedBackgroundImage },
                         )
-                    }
-                    item {
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            items(uiState.toolbarStyles, key = { it.id }) { style ->
-                                ToolbarStyleCard(
-                                    title = style.name,
-                                    backgroundColor = parseComposeColor(style.backgroundColor),
-                                    contentColor = parseComposeColor(style.contentColor),
-                                    accentColor = parseComposeColor(style.accentColor),
-                                    selected = style.id == uiState.selectedToolbarId,
-                                    onClick = { viewModel.selectToolbar(style.id) },
-                                )
-                            }
-                        }
                     }
 
                     item {
-                        FullWidthActionButton(
-                            text = if (uiState.isToolbarEnabled) {
-                                "Disable floating toolbar"
-                            } else {
-                                "Enable floating toolbar"
-                            },
+                        Button(
                             onClick = {
                                 if (uiState.isToolbarEnabled) {
-                                    viewModel.disableToolbar()
+                                    viewModel.applyCustomToolbarSettings(
+                                        customHeight = customHeight,
+                                        customLeftMargin = customLeftMargin,
+                                        customRightMargin = customRightMargin,
+                                        customIconColor = selectedIconColor,
+                                        customBackgroundColor = selectedBackgroundColor,
+                                    )
+                                    return@Button
+                                }
+
+                                if (uiState.isAccessibilityEnabled || Settings.canDrawOverlays(context)) {
+                                    viewModel.enableToolbar(
+                                        customHeight = customHeight,
+                                        customLeftMargin = customLeftMargin,
+                                        customRightMargin = customRightMargin,
+                                        customIconColor = selectedIconColor,
+                                        customBackgroundColor = selectedBackgroundColor,
+                                    )
                                 } else {
-                                    if (!uiState.isAccessibilityEnabled) {
-                                        showAccessibilityDialog = true
-                                    }
-                                    if (Settings.canDrawOverlays(context)) {
-                                        viewModel.enableToolbar()
-                                    } else {
-                                        overlayPermissionLauncher.launch(
-                                            Intent(
-                                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                                Uri.parse("package:${context.packageName}"),
-                                            ),
-                                        )
-                                    }
+                                    overlayPermissionLauncher.launch(
+                                        Intent(
+                                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                            Uri.parse("package:${context.packageName}"),
+                                        ),
+                                    )
                                 }
                             },
-                            destructive = uiState.isToolbarEnabled,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 22.dp),
-                        )
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                        ) {
+                            Text("Apply status bar")
+                        }
                     }
                 }
             }
@@ -281,30 +294,165 @@ private fun BatteryToolbarPreview(
     backgroundColor: Color,
     contentColor: Color,
     accentColor: Color,
+    height: Float = 34f,
+    leftMargin: Float = 16f,
+    rightMargin: Float = 16f,
 ) {
+    val toolbarHeight = height.dp
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(62.dp)
-            .clip(RoundedCornerShape(20.dp))
+            .padding(start = leftMargin.dp, end = rightMargin.dp)
+            .height(toolbarHeight)
+            .clip(RoundedCornerShape(0.dp))
             .background(backgroundColor)
-            .border(1.dp, accentColor.copy(alpha = 0.55f), RoundedCornerShape(20.dp))
-            .padding(horizontal = 14.dp),
+            .border(1.dp, accentColor.copy(alpha = 0.45f), RoundedCornerShape(0.dp))
+            .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Text(
+            text = "13:14",
+            color = contentColor,
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp,
+            modifier = Modifier.padding(end = 6.dp),
+        )
         AsyncImage(
             model = emojiModel,
             contentDescription = null,
-            modifier = Modifier.size(38.dp),
+            modifier = Modifier.size(22.dp),
         )
-        Spacer(Modifier.size(10.dp))
+        Spacer(Modifier.weight(1f))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(text = "◔", color = contentColor, fontSize = 12.sp)
+            Text(text = "5%", color = accentColor, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
+    }
+}
+
+@Composable
+private fun StatusBarCustomizationCard(
+    height: Float,
+    leftMargin: Float,
+    rightMargin: Float,
+    iconColor: Color,
+    backgroundColor: Color,
+    backgroundImageSelected: Boolean,
+    onHeightChange: (Float) -> Unit,
+    onLeftMarginChange: (Float) -> Unit,
+    onRightMarginChange: (Float) -> Unit,
+    onIconColorSelected: (Color) -> Unit,
+    onBackgroundColorSelected: (Color) -> Unit,
+    onBackgroundImageClick: () -> Unit,
+) {
+    val iconColors = listOf(Color.White, Color.Black, Color(0xFF36D399), Color(0xFF2EC5FF), Color(0xFFFF7A59), Color(0xFF8B5CF6))
+    val backgroundColors = listOf(
+        Color(0xFFF4D10F),
+        Color(0xFF1F2937),
+        Color(0xFFFFF7ED),
+        Color(0xFFD9F99D),
+        Color(0xFFB8E6FF),
+        Color(0xFFE9D5FF),
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(20.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(20.dp))
+            .padding(16.dp),
+    ) {
         Text(
-            text = "My battery",
-            color = contentColor,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.weight(1f),
+            text = "Status Bar Custom",
+            fontWeight = FontWeight.Bold,
+            fontSize = 22.sp,
         )
-        Text("78%", color = accentColor, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+        Spacer(Modifier.height(16.dp))
+
+        Text("Size", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+        Spacer(Modifier.height(6.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Height", modifier = Modifier.weight(1f), fontSize = 13.sp)
+            Text("${height.toInt()}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Slider(value = height, onValueChange = onHeightChange, valueRange = 24f..60f)
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Left margin", modifier = Modifier.weight(1f), fontSize = 13.sp)
+            Text("${leftMargin.toInt()}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Slider(value = leftMargin, onValueChange = onLeftMarginChange, valueRange = 0f..32f)
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Right margin", modifier = Modifier.weight(1f), fontSize = 13.sp)
+            Text("${rightMargin.toInt()}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Slider(value = rightMargin, onValueChange = onRightMarginChange, valueRange = 0f..32f)
+
+        Spacer(Modifier.height(18.dp))
+        Text("Appearance", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+        Spacer(Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Icon color", modifier = Modifier.weight(1f), fontSize = 13.sp)
+            iconColors.forEach { color ->
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(color, shape = RoundedCornerShape(50))
+                        .border(
+                            width = if (iconColor == color) 2.dp else 1.dp,
+                            color = if (iconColor == color) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.35f),
+                            shape = RoundedCornerShape(50),
+                        )
+                        .clickable { onIconColorSelected(color) },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Background color", modifier = Modifier.weight(1f), fontSize = 13.sp)
+            backgroundColors.forEach { color ->
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(color, shape = RoundedCornerShape(50))
+                        .border(
+                            width = if (backgroundColor == color) 2.dp else 1.dp,
+                            color = if (backgroundColor == color) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.35f),
+                            shape = RoundedCornerShape(50),
+                        )
+                        .clickable { onBackgroundColorSelected(color) },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onBackgroundImageClick)
+                .background(Color(0xFFDBF3FF), shape = RoundedCornerShape(10.dp))
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Background image", modifier = Modifier.weight(1f), fontSize = 13.sp, color = Color(0xFF093048))
+            Text(if (backgroundImageSelected) "Selected" else "View More", fontSize = 12.sp, color = Color(0xFF0F5C7B), fontWeight = FontWeight.Medium)
+        }
     }
 }
 
