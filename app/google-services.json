@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "709539678804",
+    "project_id": "battery-emoji-and-shemiji-anim",
+    "storage_bucket": "battery-emoji-and-shemiji-anim.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:709539678804:android:29e9f9d10c82485a0bfbc1",
+        "android_client_info": {
+          "package_name": "com.shemiji.emogibattery"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBrE4GTarIWjQtCV7LvfXsdkFkVj7kS-9k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

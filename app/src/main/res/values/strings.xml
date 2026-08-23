@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">Shemiji Battery</string>
+
+    <!-- Test Ad IDs -->
+    <string name="ad_app_id">ca-app-pub-3940256099942544~3347511713</string>
+    <string name="inter_splash">ca-app-pub-3940256099942544/1033173712</string>
+    <string name="inter_splash_high">ca-app-pub-3940256099942544/1033173712</string>
+    <string name="banner_splash">ca-app-pub-3940256099942544/6300978111</string>
+    <string name="native_splash">ca-app-pub-3940256099942544/2247696110</string>
+    <string name="native_language_1">ca-app-pub-3940256099942544/2247696110</string>
+    <string name="native_language_2">ca-app-pub-3940256099942544/2247696110</string>
+    <string name="native_home">ca-app-pub-3940256099942544/2247696110</string>
+    <string name="inter_home">ca-app-pub-3940256099942544/1033173712</string>
+    <string name="banner_home">ca-app-pub-3940256099942544/6300978111</string>
+    <string name="rewarded_home">ca-app-pub-3940256099942544/5224354917</string>
+    <string name="app_open">ca-app-pub-3940256099942544/9257395921</string>
+    <string name="ad_loading">Ad is loading…</string>
+    <string name="accessibility_description">Used to ensure the battery toolbar and Shimeji animations stay on top of other apps and remain active.</string>
+</resources>
