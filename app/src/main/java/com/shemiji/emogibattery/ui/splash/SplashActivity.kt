@@ -1,24 +1,21 @@
 package com.shemiji.emogibattery.ui.splash
 
+import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.graphics.LinearGradient
+import android.graphics.Shader
 import android.os.Bundle
-import android.view.View
+import android.view.animation.LinearInterpolator
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.lifecycle.lifecycleScope
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.FullScreenContentCallback
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.interstitial.InterstitialAd
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.shemiji.emogibattery.MainActivity
-import com.shemiji.emogibattery.R
-import com.shemiji.emogibattery.core.ads.AdsManagerKit
 import com.shemiji.emogibattery.core.remoteconfig.RemoteConfig
 import com.shemiji.emogibattery.databinding.ActivitySplashBinding
+import androidx.core.graphics.toColorInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import android.graphics.Color as AndroidColor
@@ -27,7 +24,6 @@ import android.graphics.Color as AndroidColor
 class SplashActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySplashBinding
-    private var interstitialSplash: InterstitialAd? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,61 +40,69 @@ class SplashActivity : AppCompatActivity() {
         binding = ActivitySplashBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        setupGradientText()
+        startLoadingAnimation()
+
         lifecycleScope.launch {
-            // Wait for RemoteConfig to be ready
             RemoteConfig.isReady.observe(this@SplashActivity) { ready ->
                 if (ready) {
-//loadAndShowAds()
+                    // Logic for ads could go here
                 }
             }
-        }
-        lifecycleScope.launch {
-            delay(2000)
-            navigateToNext()
         }
     }
 
-/*    private fun loadAndShowAds() {
-        if (AdsManagerKit.isProVersion.value == true || !AdsManagerKit.splashInterstitialEnabled) {
-            lifecycleScope.launch {
-                delay(2000)
-                navigateToNext()
-            }
-            return
+    private fun setupGradientText() {
+        binding.tvShimeji.post {
+            val paint = binding.tvShimeji.paint
+            val width = paint.measureText(binding.tvShimeji.text.toString())
+            val textShader: Shader = LinearGradient(
+                0f, 0f, width, 0f,
+                intArrayOf(
+                    "#632EFA".toColorInt(),
+                    "#E334EC".toColorInt()
+                ),
+                null,
+                Shader.TileMode.CLAMP
+            )
+            binding.tvShimeji.paint.shader = textShader
+            binding.tvShimeji.invalidate()
         }
+    }
 
-        val adRequest = AdRequest.Builder().build()
-        InterstitialAd.load(
-            this,
-            getString(R.string.inter_splash),
-            adRequest,
-            object : InterstitialAdLoadCallback() {
-                override fun onAdLoaded(ad: InterstitialAd) {
-                    interstitialSplash = ad
-                    showInterstitial()
-                }
-
-                override fun onAdFailedToLoad(error: LoadAdError) {
-                    navigateToNext()
+    private fun startLoadingAnimation() {
+        ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 2500
+            interpolator = LinearInterpolator()
+            addUpdateListener { animator ->
+                val progress = animator.animatedValue as Float
+                
+                // Update Progress Fill Width
+                val fillParams = binding.vProgressFill.layoutParams as ConstraintLayout.LayoutParams
+                fillParams.matchConstraintPercentWidth = progress
+                binding.vProgressFill.layoutParams = fillParams
+                
+                // Update Star Position (Bias)
+                val starParams = binding.ivProgressStar.layoutParams as ConstraintLayout.LayoutParams
+                starParams.horizontalBias = progress
+                binding.ivProgressStar.layoutParams = starParams
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    lifecycleScope.launch {
+                        delay(400)
+                        navigateToNext()
+                    }
                 }
             })
+            start()
+        }
     }
 
-    private fun showInterstitial() {
-        interstitialSplash?.fullScreenContentCallback = object : FullScreenContentCallback() {
-            override fun onAdDismissedFullScreenContent() {
-                navigateToNext()
-            }
-
-            override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                navigateToNext()
-            }
-        }
-        interstitialSplash?.show(this)
-    }*/
-
     private fun navigateToNext() {
-        startActivity(Intent(this, MainActivity::class.java))
-        finish()
+        if (!isFinishing) {
+            startActivity(Intent(this, MainActivity::class.java))
+            finish()
+        }
     }
 }

@@ -1,23 +1,130 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bgColor">
+    tools:context=".ui.splash.SplashActivity">
 
-    <ProgressBar
+    <ImageView
+        android:id="@+id/ivSplashBg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="null"
+        android:scaleType="centerCrop"
+        android:src="@drawable/splash_bg" />
+
+    <LinearLayout
+        android:id="@+id/llCenterContent"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:indeterminateTint="@color/primaryColor" />
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toTopOf="@+id/llLoading"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_chainStyle="packed">
 
-    <TextView
-        android:layout_width="wrap_content"
+        <ImageView
+            android:id="@+id/ivSplashIcon"
+            android:layout_width="157dp"
+            android:layout_height="160dp"
+            android:contentDescription="null"
+            android:src="@drawable/splash_icon" />
+
+        <TextView
+            android:id="@+id/tvBattery"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:fontFamily="@font/regular"
+            android:includeFontPadding="false"
+            android:text="Battery"
+            android:textColor="#171F37"
+            android:textSize="42sp" />
+
+        <TextView
+            android:id="@+id/tvShimeji"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="-35dp"
+            android:fontFamily="@font/regular"
+            android:includeFontPadding="false"
+            android:text="Shimeji"
+            android:textSize="64sp" />
+
+        <TextView
+            android:id="@+id/tvSubtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="-10dp"
+            android:fontFamily="@font/inter_18medium"
+            android:includeFontPadding="false"
+            android:text="Cute companions for your screen"
+            android:textColor="#707E94"
+            android:textSize="13sp" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/llLoading"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="50dp"
-        android:text="@string/app_name"
-        android:textColor="@color/primaryColor"
-        android:textSize="24sp"
-        android:textStyle="bold" />
+        android:layout_marginBottom="60dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toBottomOf="parent">
 
-</FrameLayout>
+        <TextView
+            android:id="@+id/tvLoading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/inter_18medium"
+            android:text="Loading..."
+            android:textColor="#632EFA"
+            android:textSize="14sp" />
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/clProgressContainer"
+            android:layout_width="240dp"
+            android:layout_height="28dp"
+            android:layout_marginTop="14dp">
+
+            <View
+                android:id="@+id/vProgressTrack"
+                android:layout_width="0dp"
+                android:layout_height="8dp"
+                android:background="@drawable/splash_progress_track"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <View
+                android:id="@+id/vProgressFill"
+                android:layout_width="0dp"
+                android:layout_height="8dp"
+                android:background="@drawable/splash_progress_fill"
+                app:layout_constraintBottom_toBottomOf="@+id/vProgressTrack"
+                app:layout_constraintStart_toStartOf="@+id/vProgressTrack"
+                app:layout_constraintTop_toTopOf="@+id/vProgressTrack"
+                app:layout_constraintWidth_percent="0.0" />
+
+            <ImageView
+                android:id="@+id/ivProgressStar"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:contentDescription="null"
+                android:src="@drawable/splash_star"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintHorizontal_bias="0.0"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
