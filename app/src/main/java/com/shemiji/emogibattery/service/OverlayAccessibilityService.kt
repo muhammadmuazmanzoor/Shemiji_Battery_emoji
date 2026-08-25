@@ -116,8 +116,8 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
         }
 
         val shimejiPrefs = getSharedPreferences("shimeji_overlay_runtime", MODE_PRIVATE)
-        if (shimejiPrefs.getBoolean("is_enabled", false) && !ShimejiOverlayService.isServiceRunning) {
-            startOverlayService(ShimejiOverlayService::class.java)
+        if (shimejiPrefs.getBoolean("is_enabled", false) && !ShimejiService.isServiceRunning) {
+            startOverlayService(ShimejiService::class.java)
         }
     }
 

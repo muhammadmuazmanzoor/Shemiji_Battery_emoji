@@ -58,7 +58,7 @@
         </service>
 
         <service
-            android:name=".service.ShimejiOverlayService"
+            android:name=".service.ShimejiService"
             android:exported="false"
             android:foregroundServiceType="specialUse"
             android:process=":overlay"

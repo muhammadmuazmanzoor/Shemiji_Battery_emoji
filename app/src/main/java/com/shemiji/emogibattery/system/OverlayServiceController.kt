@@ -14,7 +14,7 @@ import com.shemiji.emogibattery.data.model.ShimejiCharacter
 import com.shemiji.emogibattery.data.model.ToolbarStyle
 import com.shemiji.emogibattery.service.BatteryToolbarOverlayService
 import com.shemiji.emogibattery.service.OverlayAccessibilityService
-import com.shemiji.emogibattery.service.ShimejiOverlayService
+import com.shemiji.emogibattery.service.ShimejiService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -86,22 +86,22 @@ class OverlayServiceController @Inject constructor(
         requireOverlayPermission()
         ensureBatteryOptimizationExemption()
 
-        val intent = Intent(context, ShimejiOverlayService::class.java).apply {
-            putExtra(ShimejiOverlayService.EXTRA_DRAWABLE_RES, character.drawableRes ?: 0)
+        val intent = Intent(context, ShimejiService::class.java).apply {
+            putExtra(ShimejiService.EXTRA_DRAWABLE_RES, character.drawableRes ?: 0)
             putExtra(
-                ShimejiOverlayService.EXTRA_IMAGE_URL,
+                ShimejiService.EXTRA_IMAGE_URL,
                 character.animationUrl?.takeIf(String::isNotBlank) ?: character.imageUrl,
             )
-            putExtra(ShimejiOverlayService.EXTRA_CHARACTER_NAME, character.name)
-            putExtra(ShimejiOverlayService.EXTRA_MOVEMENT_SPEED, character.movementSpeed)
+            putExtra(ShimejiService.EXTRA_CHARACTER_NAME, character.name)
+            putExtra(ShimejiService.EXTRA_MOVEMENT_SPEED, character.movementSpeed)
         }
         ContextCompat.startForegroundService(context, intent)
         Unit
     }
 
     fun stopShimeji(): Result<Unit> = runCatching {
-        val intent = Intent(context, ShimejiOverlayService::class.java).apply {
-            action = ShimejiOverlayService.ACTION_STOP
+        val intent = Intent(context, ShimejiService::class.java).apply {
+            action = ShimejiService.ACTION_STOP
         }
         context.startService(intent)
         Unit
