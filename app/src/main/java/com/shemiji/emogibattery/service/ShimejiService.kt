@@ -238,20 +238,25 @@ private fun SpriteCharacter(motion: ShimejiMotion, edge: ScreenEdge) {
     val sheet = ImageBitmap.imageResource(R.drawable.img_1)
     var clock by remember { mutableLongStateOf(0L) }
     LaunchedEffect(Unit) { while (true) { clock = android.os.SystemClock.uptimeMillis(); delay(12L) } }
-    val phase = ((clock / 180L) % 2L).toInt()
+    val phase = ((clock / 150L) % 4L).toInt()
     val (row, column) = when {
         motion == ShimejiMotion.IDLE -> 0 to 0
+        motion == ShimejiMotion.FALLING -> 7 to (phase % 2)
+        motion == ShimejiMotion.BOUNCING -> 7 to 2
+        motion == ShimejiMotion.JUMPING_LEFT_TO_RIGHT || motion == ShimejiMotion.JUMPING_RIGHT_TO_LEFT -> 3 + (phase % 3) to phase
+        motion == ShimejiMotion.TOP_WALKING_LEFT || motion == ShimejiMotion.TOP_WALKING_RIGHT -> 6 to phase
+        motion == ShimejiMotion.CLIMBING_LEFT || motion == ShimejiMotion.CLIMBING_RIGHT -> 5 to phase
         edge == ScreenEdge.BOTTOM -> 1 to phase
-        edge == ScreenEdge.TOP -> 1 to 5
-        edge == ScreenEdge.LEFT -> 2 to if (phase == 0) 0 else 5
-        else -> 5 to if (phase == 0) 2 else 0
+        else -> 0 to phase
     }
-    val flip = edge == ScreenEdge.RIGHT || (edge == ScreenEdge.BOTTOM && motion == ShimejiMotion.WALKING_LEFT)
+    val flip = motion == ShimejiMotion.WALKING_LEFT ||
+        motion == ShimejiMotion.CLIMBING_RIGHT ||
+        motion == ShimejiMotion.JUMPING_RIGHT_TO_LEFT ||
+        motion == ShimejiMotion.TOP_WALKING_LEFT
     Canvas(Modifier.fillMaxSize().graphicsLayer { scaleX = if (flip) -1f else 1f }) {
         drawImage(sheet, IntOffset(column * sheet.width / 4, row * sheet.height / 8), IntSize(sheet.width / 4, sheet.height / 8),
             dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()))
     }
 }
-
 
 
