@@ -235,7 +235,7 @@ class ShimejiService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStat
 
 @Composable
 private fun SpriteCharacter(motion: ShimejiMotion, edge: ScreenEdge) {
-    val sheet = ImageBitmap.imageResource(R.drawable.img6)
+    val sheet = ImageBitmap.imageResource(R.drawable.img15)
     var clock by remember { mutableLongStateOf(0L) }
     LaunchedEffect(Unit) { while (true) { clock = android.os.SystemClock.uptimeMillis(); delay(12L) } }
     val phase = ((clock / 150L) % 4L).toInt()
