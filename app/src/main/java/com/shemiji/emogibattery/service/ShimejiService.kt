@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
+import android.graphics.BitmapFactory
 import android.os.BatteryManager
 import android.os.Build
 import android.os.IBinder
@@ -34,10 +35,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -82,6 +83,7 @@ class ShimejiService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStat
     private var ticker: Job? = null
     private var batteryRegistered = false
     private var batteryPercent by mutableIntStateOf(0)
+    private var spriteDrawableRes by mutableIntStateOf(R.drawable.img_1)
     private var speedMultiplier = 1f
     private var downWindowX = 0
     private var downWindowY = 0
@@ -107,24 +109,62 @@ class ShimejiService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStat
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // A request queued with startForegroundService() must always be acknowledged
+        // before any early return. In particular, an accessibility-service restart can
+        // race with the user disabling Shimeji, leaving the persisted flag false by the
+        // time this command is delivered.
+        promoteToForeground("Shimeji")
+
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
         if (intent?.action == ACTION_STOP) {
-            prefs.edit().putBoolean(EXTRA_IS_ENABLED, false).commit(); stopSelf(); return START_NOT_STICKY
+            prefs.edit().putBoolean(EXTRA_IS_ENABLED, false).commit()
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelfResult(startId)
+            return START_NOT_STICKY
         }
         if (intent?.hasExtra(EXTRA_CHARACTER_NAME) == true) {
+            val incomingDrawable = intent.getIntExtra(EXTRA_DRAWABLE_RES, R.drawable.img_1)
+                .takeIf { it != 0 } ?: R.drawable.img_1
             prefs.edit().putString(EXTRA_CHARACTER_NAME, intent.getStringExtra(EXTRA_CHARACTER_NAME))
                 .putFloat(EXTRA_MOVEMENT_SPEED, intent.getFloatExtra(EXTRA_MOVEMENT_SPEED, 1f))
+                .putInt(EXTRA_DRAWABLE_RES, incomingDrawable)
                 .putBoolean(EXTRA_IS_ENABLED, true).commit()
         }
-        if (!prefs.getBoolean(EXTRA_IS_ENABLED, false)) { stopSelf(); return START_NOT_STICKY }
+        if (!prefs.getBoolean(EXTRA_IS_ENABLED, false)) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelfResult(startId)
+            return START_NOT_STICKY
+        }
         speedMultiplier = prefs.getFloat(EXTRA_MOVEMENT_SPEED, 3f)
+        spriteDrawableRes = prefs.getInt(EXTRA_DRAWABLE_RES, R.drawable.img_1)
         val name = prefs.getString(EXTRA_CHARACTER_NAME, "Shimeji") ?: "Shimeji"
-        val notification = OverlayNotificationHelper.build(this, "$name is active", "Drag the pet; battery shelf is active")
-        if (Build.VERSION.SDK_INT >= 34) startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        else startForeground(NOTIFICATION_ID, notification)
-        if (Settings.canDrawOverlays(this)) showOverlays() else stopSelf()
+        promoteToForeground(name)
+        if (Settings.canDrawOverlays(this)) {
+            showOverlays()
+        } else {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelfResult(startId)
+            return START_NOT_STICKY
+        }
         // START_STICKY rebuilds both windows from persisted pose/coordinates after process death.
         return START_STICKY
+    }
+
+    private fun promoteToForeground(name: String) {
+        val notification = OverlayNotificationHelper.build(
+            this,
+            "$name is active",
+            "Drag the pet; battery shelf is active",
+        )
+        if (Build.VERSION.SDK_INT >= 34) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun showOverlays() {
@@ -132,7 +172,7 @@ class ShimejiService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStat
         val size = dp(112); val shelfHeight = dp(48)
         physics.configure(resources.displayMetrics.widthPixels, resources.displayMetrics.heightPixels, size, shelfHeight, speedMultiplier)
         restoreState()
-        val pet = ownedComposeView { SpriteCharacter(physics.motion, physics.edge) }
+        val pet = ownedComposeView { SpriteCharacter(spriteDrawableRes, physics.motion, physics.edge) }
         val petParams = WindowManager.LayoutParams(size, size, overlayWindowType(),
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT).apply {
@@ -234,8 +274,15 @@ class ShimejiService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStat
 }
 
 @Composable
-private fun SpriteCharacter(motion: ShimejiMotion, edge: ScreenEdge) {
-    val sheet = ImageBitmap.imageResource(R.drawable.img15)
+private fun SpriteCharacter(drawableRes: Int, motion: ShimejiMotion, edge: ScreenEdge) {
+    val resources = LocalContext.current.resources
+    val sheet = remember(resources, drawableRes) {
+        BitmapFactory.decodeResource(
+            resources,
+            drawableRes,
+            BitmapFactory.Options().apply { inScaled = false },
+        ).asImageBitmap()
+    }
     var clock by remember { mutableLongStateOf(0L) }
     LaunchedEffect(Unit) { while (true) { clock = android.os.SystemClock.uptimeMillis(); delay(12L) } }
     val phase = ((clock / 150L) % 4L).toInt()
@@ -243,7 +290,7 @@ private fun SpriteCharacter(motion: ShimejiMotion, edge: ScreenEdge) {
         motion == ShimejiMotion.IDLE -> 0 to 0
         motion == ShimejiMotion.FALLING -> 7 to (phase % 2)
         motion == ShimejiMotion.BOUNCING -> 7 to 2
-        motion == ShimejiMotion.JUMPING_LEFT_TO_RIGHT || motion == ShimejiMotion.JUMPING_RIGHT_TO_LEFT -> 3 + (phase % 3) to phase
+        motion == ShimejiMotion.JUMPING_LEFT_TO_RIGHT || motion == ShimejiMotion.JUMPING_RIGHT_TO_LEFT -> 3 to phase
         motion == ShimejiMotion.TOP_WALKING_LEFT || motion == ShimejiMotion.TOP_WALKING_RIGHT -> 6 to phase
         motion == ShimejiMotion.CLIMBING_LEFT || motion == ShimejiMotion.CLIMBING_RIGHT -> 5 to phase
         edge == ScreenEdge.BOTTOM -> 1 to phase
@@ -254,9 +301,11 @@ private fun SpriteCharacter(motion: ShimejiMotion, edge: ScreenEdge) {
         motion == ShimejiMotion.JUMPING_RIGHT_TO_LEFT ||
         motion == ShimejiMotion.TOP_WALKING_LEFT
     Canvas(Modifier.fillMaxSize().graphicsLayer { scaleX = if (flip) -1f else 1f }) {
-        drawImage(sheet, IntOffset(column * sheet.width / 4, row * sheet.height / 8), IntSize(sheet.width / 4, sheet.height / 8),
+        val left = column * sheet.width / 4
+        val right = (column + 1) * sheet.width / 4
+        val top = row * sheet.height / 8
+        val bottom = (row + 1) * sheet.height / 8
+        drawImage(sheet, IntOffset(left, top), IntSize(right - left, bottom - top),
             dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()))
     }
 }
-
-

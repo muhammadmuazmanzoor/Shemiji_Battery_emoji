@@ -71,6 +71,23 @@ class ShimejiViewModel @Inject constructor(
         }
     }
 
+    fun enableShimeji(characterId: String) {
+        val character = _uiState.value.characters.firstOrNull { it.id == characterId }
+            ?: return showMessage("This Shimeji character is unavailable")
+        _uiState.update { it.copy(selectedCharacterId = characterId, message = null) }
+
+        viewModelScope.launch {
+            overlayController.startShimeji(character)
+                .onSuccess {
+                    preferences.setShimeji(character.id, enabled = true)
+                    showMessage("${character.name} is now active")
+                }
+                .onFailure { throwable ->
+                    showMessage(throwable.message ?: "Unable to start the Shimeji character")
+                }
+        }
+    }
+
     fun disableShimeji() {
         viewModelScope.launch {
             overlayController.stopShimeji()

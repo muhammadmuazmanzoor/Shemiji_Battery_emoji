@@ -6,7 +6,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
-import android.text.TextUtils
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.shemiji.emogibattery.data.model.BatteryEmoji
@@ -30,21 +29,7 @@ class OverlayServiceController @Inject constructor(
     }
 
     fun isAccessibilityServiceEnabled(): Boolean {
-        val expectedComponentName = android.content.ComponentName(context, OverlayAccessibilityService::class.java)
-        val enabledServices = Settings.Secure.getString(
-            context.contentResolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-        ) ?: return false
-
-        val colonSplitter = TextUtils.SimpleStringSplitter(':')
-        colonSplitter.setString(enabledServices)
-        while (colonSplitter.hasNext()) {
-            val componentName = colonSplitter.next()
-            if (componentName.equals(expectedComponentName.flattenToString(), ignoreCase = true)) {
-                return true
-            }
-        }
-        return false
+        return AccessibilityPermission.isEnabled(context)
     }
 
     fun startBatteryToolbar(

@@ -60,6 +60,7 @@ import com.shemiji.emogibattery.ui.theme.neutral200
 import com.shemiji.emogibattery.ui.theme.neutral700
 import com.shemiji.emogibattery.ui.theme.primary600
 import com.shemiji.emogibattery.ui.theme.warning
+import com.shemiji.emogibattery.ui.components.SpriteSheetPose
 import com.shemiji.emogibattery.ui.viewmodel.content.BatteryCustomizationViewModel
 import com.shemiji.emogibattery.ui.viewmodel.content.ShimejiViewModel
 import com.shemiji.emogibattery.ui.viewmodel.content.WallpapersViewModel
@@ -69,7 +70,10 @@ fun HomeScreen(
     onBatteryCustomization: () -> Unit,
     onWallpapers: () -> Unit,
     onShimeji: () -> Unit,
+    onShimejiCharacter: (String) -> Unit,
     onSettings: () -> Unit,
+    showAccessibilityPermission: Boolean = false,
+    onAccessibilityAgree: () -> Unit = {},
     shimejiViewModel: ShimejiViewModel = hiltViewModel(),
     batteryViewModel: BatteryCustomizationViewModel = hiltViewModel(),
     wallpapersViewModel: WallpapersViewModel = hiltViewModel(),
@@ -121,12 +125,11 @@ fun HomeScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp)
                             ) {
-                                items(shimejiUiState.characters.take(5), key = { it.id }) { character ->
+                                items(shimejiUiState.characters, key = { it.id }) { character ->
                                     TrendingShimejiItem(
                                         character = character,
                                         onClick = { 
-                                            shimejiViewModel.selectCharacter(character.id)
-                                            onShimeji() 
+                                            onShimejiCharacter(character.id)
                                         }
                                     )
                                 }
@@ -187,6 +190,10 @@ fun HomeScreen(
                     }
                 }
             }
+        }
+
+        if (showAccessibilityPermission) {
+            AccessibilityPermissionSheet(onAgree = onAccessibilityAgree)
         }
     }
 }
@@ -460,61 +467,38 @@ private fun TrendingShimejiItem(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            AsyncImage(
+            character.drawableRes?.let { drawableRes ->
+                SpriteSheetPose(
+                    drawableRes = drawableRes,
+                    row = 0,
+                    column = 0,
+                    modifier = Modifier
+                        .width(78.dp)
+                        .height(88.dp)
+                        .padding(top = 4.dp, start = 4.dp, end = 4.dp),
+                )
+            } ?: AsyncImage(
                 model = character.imageModel(),
-                contentDescription = null,
+                contentDescription = character.name,
+                modifier = Modifier.width(78.dp).height(88.dp),
+            )
+            Box(
                 modifier = Modifier
                     .width(78.dp)
-                    .height(88.dp)
-                    .padding(top = 4.dp, start = 4.dp, end = 4.dp)
-            )
-            if (character.isPremium) {
-                Row(
-                    modifier = Modifier
-                        //.padding(bottom = 2.dp)
-                        .width(73.dp)
-                        .height(24.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .border(1.dp, warning, RoundedCornerShape(18.dp)),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_pro),
-                        contentDescription = null,
-                        modifier = Modifier.size(12.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Unlock",
-                        fontSize = 10.sp,
-                        lineHeight = 10.sp,
-                        maxLines = 1,
-                        fontWeight = FontWeight.SemiBold,
-                        fontFamily = InterFontFamily,
-                        color = warning
-                    )
-                }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .width(73.dp)
-                        .height(24.dp)
-                       // .padding(bottom = 2.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .border(1.dp, primary600, RoundedCornerShape(50)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Add",
-                        fontSize = 10.sp,
-                        lineHeight = 10.sp,
-                        maxLines = 1,
-                        fontWeight = FontWeight.SemiBold,
-                        fontFamily = InterFontFamily,
-                        color = primary600
-                    )
-                }
+                    .height(24.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .border(1.dp, primary600, RoundedCornerShape(50)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = character.name,
+                    fontSize = 9.sp,
+                    lineHeight = 10.sp,
+                    maxLines = 1,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = InterFontFamily,
+                    color = primary600,
+                )
             }
         }
     }
@@ -596,6 +580,7 @@ fun displayHomeScreen() {
         onBatteryCustomization = {},
         onWallpapers = {},
         onShimeji = {},
+        onShimejiCharacter = {},
         onSettings = {},
     )
 }
