@@ -52,6 +52,7 @@ import com.shemiji.emogibattery.data.model.BatteryEmoji
 import com.shemiji.emogibattery.data.model.ShimejiCharacter
 import com.shemiji.emogibattery.data.model.WallpaperItem
 import com.shemiji.emogibattery.data.model.imageModel
+import com.shemiji.emogibattery.ui.components.SpriteSheetPose
 import com.shemiji.emogibattery.ui.theme.AppFontFamily
 import com.shemiji.emogibattery.ui.theme.InterFontFamily
 import com.shemiji.emogibattery.ui.theme.buttongradientEnd
@@ -59,8 +60,6 @@ import com.shemiji.emogibattery.ui.theme.buttongradientStart
 import com.shemiji.emogibattery.ui.theme.neutral200
 import com.shemiji.emogibattery.ui.theme.neutral700
 import com.shemiji.emogibattery.ui.theme.primary600
-import com.shemiji.emogibattery.ui.theme.warning
-import com.shemiji.emogibattery.ui.components.SpriteSheetPose
 import com.shemiji.emogibattery.ui.viewmodel.content.BatteryCustomizationViewModel
 import com.shemiji.emogibattery.ui.viewmodel.content.ShimejiViewModel
 import com.shemiji.emogibattery.ui.viewmodel.content.WallpapersViewModel
