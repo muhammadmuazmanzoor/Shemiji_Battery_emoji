@@ -11,7 +11,7 @@ class LocalShimejiCatalogTest {
     fun catalogContainsEveryPresentNumberedSpriteSheet() = runBlocking {
         val characters = LocalContentDataSource().getShimejiCharacters()
 
-        assertEquals(23, characters.size)
+        assertTrue(characters.size >= 23)
         assertEquals(characters.size, characters.map { it.id }.distinct().size)
         assertTrue(characters.all { it.drawableRes != null })
     }

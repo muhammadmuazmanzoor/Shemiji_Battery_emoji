@@ -1,10 +1,7 @@
 package com.shemiji.emogibattery.ui.screens
 
 import android.content.Intent
-import android.net.Uri
 import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -88,12 +85,6 @@ fun BatteryCustomizationScreen(
         customRightMargin = uiState.customToolbarRightMargin
         selectedIconColor = uiState.customToolbarIconColor
         selectedBackgroundColor = uiState.customToolbarBackgroundColor
-    }
-
-    val overlayPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult(),
-    ) {
-        if (Settings.canDrawOverlays(context)) viewModel.enableToolbar()
     }
 
     LaunchedEffect(uiState.message) {
@@ -258,7 +249,7 @@ fun BatteryCustomizationScreen(
                                     return@Button
                                 }
 
-                                if (uiState.isAccessibilityEnabled || Settings.canDrawOverlays(context)) {
+                                if (uiState.isAccessibilityEnabled) {
                                     viewModel.enableToolbar(
                                         customHeight = customHeight,
                                         customLeftMargin = customLeftMargin,
@@ -267,12 +258,7 @@ fun BatteryCustomizationScreen(
                                         customBackgroundColor = selectedBackgroundColor,
                                     )
                                 } else {
-                                    overlayPermissionLauncher.launch(
-                                        Intent(
-                                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                            Uri.parse("package:${context.packageName}"),
-                                        ),
-                                    )
+                                    showAccessibilityDialog = true
                                 }
                             },
                             modifier = Modifier

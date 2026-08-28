@@ -23,6 +23,8 @@ data class ShimejiUiState(
     val selectedCharacterId: String? = null,
     val isEnabled: Boolean = false,
     val isAccessibilityEnabled: Boolean = false,
+    val shimejiSizeDp: Int = 112,
+    val shimejiSpeed: Float = 1f,
     val errorMessage: String? = null,
     val message: String? = null,
     val sourceMode: ContentSourceMode = ContentSourceMode.LOCAL_DRAWABLES,
@@ -71,15 +73,26 @@ class ShimejiViewModel @Inject constructor(
         }
     }
 
-    fun enableShimeji(characterId: String) {
+    fun enableShimeji(
+        characterId: String,
+        sizeDp: Int = _uiState.value.shimejiSizeDp,
+        speed: Float = _uiState.value.shimejiSpeed,
+    ) {
         val character = _uiState.value.characters.firstOrNull { it.id == characterId }
             ?: return showMessage("This Shimeji character is unavailable")
         _uiState.update { it.copy(selectedCharacterId = characterId, message = null) }
 
         viewModelScope.launch {
-            overlayController.startShimeji(character)
+            val safeSize = sizeDp.coerceIn(72, 176)
+            val safeSpeed = speed.coerceIn(0.5f, 3f)
+            overlayController.startShimeji(character, safeSize, safeSpeed)
                 .onSuccess {
-                    preferences.setShimeji(character.id, enabled = true)
+                    preferences.setShimeji(
+                        characterId = character.id,
+                        enabled = true,
+                        sizeDp = safeSize,
+                        speed = safeSpeed,
+                    )
                     showMessage("${character.name} is now active")
                 }
                 .onFailure { throwable ->
@@ -151,6 +164,8 @@ class ShimejiViewModel @Inject constructor(
                         selectedCharacterId = selections.shimejiCharacterId
                             ?: it.selectedCharacterId,
                         isEnabled = selections.shimejiEnabled,
+                        shimejiSizeDp = selections.shimejiSizeDp,
+                        shimejiSpeed = selections.shimejiSpeed,
                     )
                 }
             }

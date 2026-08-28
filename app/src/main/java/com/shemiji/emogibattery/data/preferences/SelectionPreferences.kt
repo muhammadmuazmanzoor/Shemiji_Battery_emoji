@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -27,6 +28,8 @@ data class UserSelections(
     val shimejiCharacterId: String? = null,
     val batteryToolbarEnabled: Boolean = false,
     val shimejiEnabled: Boolean = false,
+    val shimejiSizeDp: Int = 112,
+    val shimejiSpeed: Float = 1f,
     val toolbarHeight: Int = 34,
     val toolbarLeftMargin: Int = 16,
     val toolbarRightMargin: Int = 16,
@@ -45,6 +48,8 @@ class SelectionPreferences @Inject constructor(
         val shimejiCharacterId = stringPreferencesKey("shimeji_character_id")
         val batteryToolbarEnabled = booleanPreferencesKey("battery_toolbar_enabled")
         val shimejiEnabled = booleanPreferencesKey("shimeji_enabled")
+        val shimejiSizeDp = intPreferencesKey("shimeji_size_dp")
+        val shimejiSpeed = floatPreferencesKey("shimeji_speed")
         val toolbarHeight = intPreferencesKey("toolbar_height")
         val toolbarLeftMargin = intPreferencesKey("toolbar_left_margin")
         val toolbarRightMargin = intPreferencesKey("toolbar_right_margin")
@@ -65,6 +70,8 @@ class SelectionPreferences @Inject constructor(
                 shimejiCharacterId = preferences[Keys.shimejiCharacterId],
                 batteryToolbarEnabled = preferences[Keys.batteryToolbarEnabled] ?: false,
                 shimejiEnabled = preferences[Keys.shimejiEnabled] ?: false,
+                shimejiSizeDp = preferences[Keys.shimejiSizeDp] ?: 112,
+                shimejiSpeed = preferences[Keys.shimejiSpeed] ?: 1f,
                 toolbarHeight = preferences[Keys.toolbarHeight] ?: 34,
                 toolbarLeftMargin = preferences[Keys.toolbarLeftMargin] ?: 16,
                 toolbarRightMargin = preferences[Keys.toolbarRightMargin] ?: 16,
@@ -119,10 +126,17 @@ class SelectionPreferences @Inject constructor(
         context.selectionDataStore.edit { it[Keys.wallpaperId] = wallpaperId }
     }
 
-    suspend fun setShimeji(characterId: String, enabled: Boolean) {
+    suspend fun setShimeji(
+        characterId: String,
+        enabled: Boolean,
+        sizeDp: Int = 112,
+        speed: Float = 1f,
+    ) {
         context.selectionDataStore.edit { preferences ->
             preferences[Keys.shimejiCharacterId] = characterId
             preferences[Keys.shimejiEnabled] = enabled
+            preferences[Keys.shimejiSizeDp] = sizeDp.coerceIn(72, 176)
+            preferences[Keys.shimejiSpeed] = speed.coerceIn(0.5f, 3f)
         }
     }
 

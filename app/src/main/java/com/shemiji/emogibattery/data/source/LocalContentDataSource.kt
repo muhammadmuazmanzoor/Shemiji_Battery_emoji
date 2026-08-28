@@ -39,15 +39,11 @@ class LocalContentDataSource @Inject constructor() : ContentDataSource {
     )
 
     override suspend fun getShimejiCharacters(): List<ShimejiCharacter> = listOf(
-        ShimejiCharacter("shimeji_01", "Spider-Man", drawableRes = R.drawable.img_1, isPremium = true),
         ShimejiCharacter("shimeji_02", "Pikachu", drawableRes = R.drawable.img2),
         ShimejiCharacter("shimeji_03", "Kitty", drawableRes = R.drawable.img3),
-        ShimejiCharacter("shimeji_04", "Stitch", drawableRes = R.drawable.img4 ,isPremium = true),
         ShimejiCharacter("shimeji_05", "Doraemon", drawableRes = R.drawable.img5 ,isPremium = true),
         ShimejiCharacter("shimeji_06", "Sonic", drawableRes = R.drawable.img6),
-        ShimejiCharacter("shimeji_07", "Naruto", drawableRes = R.drawable.img7),
         ShimejiCharacter("shimeji_08", "Goku", drawableRes = R.drawable.img8 ,isPremium = true),
-        ShimejiCharacter("shimeji_09", "Luffy", drawableRes = R.drawable.img9),
         ShimejiCharacter("shimeji_10", "Gojo", drawableRes = R.drawable.img10),
 
         ShimejiCharacter("shimeji_12", "Totoro", drawableRes = R.drawable.img12 ,isPremium = true),
@@ -74,5 +70,7 @@ class LocalContentDataSource @Inject constructor() : ContentDataSource {
         ShimejiCharacter("shimeji_33", "Cute", drawableRes = R.drawable.img33),
         ShimejiCharacter("shimeji_34", "Puppy", drawableRes = R.drawable.img34),
         ShimejiCharacter("shimeji_35", "Baby", drawableRes = R.drawable.img35 ,isPremium = true),
+        ShimejiCharacter("shimeji_36", "Baby", drawableRes = R.drawable.img36 ,isPremium = true),
+        ShimejiCharacter("shimeji_37", "Baby", drawableRes = R.drawable.img37 ,isPremium = true),
     )
 }

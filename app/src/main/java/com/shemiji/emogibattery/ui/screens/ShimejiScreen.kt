@@ -1,11 +1,7 @@
 package com.shemiji.emogibattery.ui.screens
 
 import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,6 +27,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -38,7 +36,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +46,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -69,6 +71,7 @@ import com.shemiji.emogibattery.ui.theme.primary200
 import com.shemiji.emogibattery.ui.theme.primary600
 import com.shemiji.emogibattery.ui.theme.primory100
 import com.shemiji.emogibattery.ui.viewmodel.content.ShimejiViewModel
+import kotlin.math.roundToInt
 
 @Composable
 fun ShimejiScreen(
@@ -120,10 +123,12 @@ fun ShimejiDetailScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedPose by remember(characterId) { mutableStateOf(ShimejiPoses.first()) }
-    val overlayPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult(),
-    ) {
-        if (Settings.canDrawOverlays(context)) viewModel.enableShimeji(characterId)
+    var sizeDp by rememberSaveable(characterId) { mutableFloatStateOf(112f) }
+    var speed by rememberSaveable(characterId) { mutableFloatStateOf(1f) }
+
+    LaunchedEffect(characterId, uiState.shimejiSizeDp, uiState.shimejiSpeed) {
+        sizeDp = uiState.shimejiSizeDp.toFloat()
+        speed = uiState.shimejiSpeed
     }
 
     LaunchedEffect(uiState.message) {
@@ -157,12 +162,10 @@ fun ShimejiDetailScreen(
                                     ).show()
                                     AccessibilityPermission.openSettings(context)
                                 }
-                                Settings.canDrawOverlays(context) -> viewModel.enableShimeji(characterId)
-                                else -> overlayPermissionLauncher.launch(
-                                    Intent(
-                                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                        Uri.parse("package:${context.packageName}"),
-                                    ),
+                                else -> viewModel.enableShimeji(
+                                    characterId,
+                                    sizeDp.roundToInt(),
+                                    speed,
                                 )
                             }
                         },
@@ -242,9 +245,161 @@ fun ShimejiDetailScreen(
                             onClick = { selectedPose = pose },
                         )
                     }
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        ShimejiCustomizationPanel(
+                            sizeDp = sizeDp,
+                            speed = speed,
+                            onSizeChange = { sizeDp = it },
+                            onSpeedChange = { speed = it },
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ShimejiCustomizationPanel(
+    sizeDp: Float,
+    speed: Float,
+    onSizeChange: (Float) -> Unit,
+    onSpeedChange: (Float) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp, bottom = 6.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(primory100)
+            .border(1.dp, primary200, RoundedCornerShape(20.dp))
+            .padding(16.dp),
+    ) {
+        Text(
+            "Customize Shimeji",
+            color = neutral700,
+            fontFamily = InterFontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp,
+        )
+        Spacer(Modifier.height(18.dp))
+        CustomizationControl(
+            title = "Size",
+            valueLabel = "${sizeDp.roundToInt()} dp",
+            value = sizeDp,
+            valueRange = 72f..176f,
+            steps = 12,
+            startLabel = "Small",
+            endLabel = "Large",
+            onDecrease = { onSizeChange((sizeDp - 8f).coerceAtLeast(72f)) },
+            onIncrease = { onSizeChange((sizeDp + 8f).coerceAtMost(176f)) },
+            onValueChange = { onSizeChange(((it / 8f).roundToInt() * 8f).coerceIn(72f, 176f)) },
+        )
+        Spacer(Modifier.height(18.dp))
+        CustomizationControl(
+            title = "Movement speed",
+            valueLabel = String.format(java.util.Locale.US, "%.2f×", speed),
+            value = speed,
+            valueRange = 0.5f..3f,
+            steps = 9,
+            startLabel = "Slow",
+            endLabel = "Fast",
+            onDecrease = { onSpeedChange((speed - 0.25f).coerceAtLeast(0.5f)) },
+            onIncrease = { onSpeedChange((speed + 0.25f).coerceAtMost(3f)) },
+            onValueChange = {
+                onSpeedChange(((it * 4f).roundToInt() / 4f).coerceIn(0.5f, 3f))
+            },
+        )
+    }
+}
+
+@Composable
+private fun CustomizationControl(
+    title: String,
+    valueLabel: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    startLabel: String,
+    endLabel: String,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit,
+    onValueChange: (Float) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            color = neutral700,
+            fontFamily = InterFontFamily,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 14.sp,
+        )
+        Text(
+            valueLabel,
+            color = primary600,
+            fontFamily = InterFontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 13.sp,
+        )
+    }
+    Spacer(Modifier.height(7.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        StepButton(symbol = "−", contentDescription = "Decrease $title", onClick = onDecrease)
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = valueRange,
+            steps = steps,
+            modifier = Modifier.weight(1f),
+            colors = SliderDefaults.colors(
+                thumbColor = primary600,
+                activeTrackColor = primary600,
+                activeTickColor = Color.White,
+                inactiveTrackColor = primary200,
+                inactiveTickColor = primary600.copy(alpha = 0.35f),
+            ),
+        )
+        StepButton(symbol = "+", contentDescription = "Increase $title", onClick = onIncrease)
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 44.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(startLabel, color = neutral500, fontFamily = InterFontFamily, fontSize = 10.sp)
+        Text(endLabel, color = neutral500, fontFamily = InterFontFamily, fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun StepButton(
+    symbol: String,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(RoundedCornerShape(50))
+            .background(Color.White)
+            .border(1.dp, primary200, RoundedCornerShape(50))
+            .semantics { this.contentDescription = contentDescription }
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            symbol,
+            color = primary600,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 

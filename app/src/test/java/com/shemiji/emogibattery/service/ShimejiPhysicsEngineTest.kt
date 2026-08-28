@@ -31,4 +31,23 @@ class ShimejiPhysicsEngineTest {
         assertEquals(900f, engine.y, 0.01f)
         assertTrue(engine.motion == ShimejiMotion.WALKING_LEFT || engine.motion == ShimejiMotion.WALKING_RIGHT)
     }
+
+    @Test fun customizationChangesMovementDistanceAndClampsForCharacterSize() {
+        val slow = ShimejiPhysicsEngine().apply {
+            configure(600, 1_000, 100, 0, 0.5f)
+            restore(300f, 900f, ShimejiMotion.WALKING_RIGHT, ScreenEdge.BOTTOM)
+            tick(50)
+        }
+        val fast = ShimejiPhysicsEngine().apply {
+            configure(600, 1_000, 100, 0, 2f)
+            restore(300f, 900f, ShimejiMotion.WALKING_RIGHT, ScreenEdge.BOTTOM)
+            tick(50)
+        }
+        assertTrue(fast.x - 300f > slow.x - 300f)
+
+        fast.restore(500f, 900f, ShimejiMotion.WALKING_RIGHT, ScreenEdge.BOTTOM)
+        fast.configure(600, 1_000, 240, 0, 2f)
+        assertTrue(fast.x <= 360f)
+        assertTrue(fast.y <= 760f)
+    }
 }
