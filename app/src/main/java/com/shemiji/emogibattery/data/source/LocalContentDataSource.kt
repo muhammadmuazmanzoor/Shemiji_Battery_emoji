@@ -12,13 +12,38 @@ import javax.inject.Singleton
 class LocalContentDataSource @Inject constructor() : ContentDataSource {
 
     override suspend fun getBatteryEmojis(): List<BatteryEmoji> = listOf(
-        BatteryEmoji("battery_angry", "Angry", drawableRes = R.drawable.battery1,isPremium = true),
-        BatteryEmoji("angry", "Angry", drawableRes = R.drawable.battery2, isPremium = true),
-        BatteryEmoji("beauty", "Angry", drawableRes = R.drawable.battery3),
+        BatteryEmoji("battery_fury", "Fury", drawableRes = R.drawable.battery1, isPremium = true),
+        BatteryEmoji("battery_rage", "Rage", drawableRes = R.drawable.battery2, isPremium = true),
+        BatteryEmoji("battery_glam", "Glam", drawableRes = R.drawable.battery3),
+
         BatteryEmoji("battery_happy", "Happy", drawableRes = R.drawable.demo_battery_happy),
         BatteryEmoji("battery_love", "Love", drawableRes = R.drawable.demo_battery_love),
-        BatteryEmoji("battery_charge", "Power", drawableRes = R.drawable.demo_battery_power),
-        BatteryEmoji("battery_sleep", "Sleepy", drawableRes = R.drawable.demo_battery_sleepy),
+
+        BatteryEmoji("battery_power", "Power", drawableRes = R.drawable.battery_01),
+        BatteryEmoji("battery_sleepy", "Sleepy", drawableRes = R.drawable.battery_02),
+        BatteryEmoji("battery_smile", "Smile", drawableRes = R.drawable.battery_03),
+        BatteryEmoji("battery_cute", "Cute", drawableRes = R.drawable.battery_04),
+        BatteryEmoji("battery_cool", "Cool", drawableRes = R.drawable.battery_05),
+        BatteryEmoji("battery_wink", "Wink", drawableRes = R.drawable.battery_06),
+        BatteryEmoji("battery_joy", "Joy", drawableRes = R.drawable.battery_07),
+        BatteryEmoji("battery_blush", "Blush", drawableRes = R.drawable.battery_08),
+        BatteryEmoji("battery_star", "Star", drawableRes = R.drawable.battery_09),
+        BatteryEmoji("battery_dream", "Dream", drawableRes = R.drawable.battery_10),
+        BatteryEmoji("battery_spark", "Spark", drawableRes = R.drawable.battery_11),
+        BatteryEmoji("battery_magic", "Magic", drawableRes = R.drawable.battery_12),
+        BatteryEmoji("battery_sweet", "Sweet", drawableRes = R.drawable.battery_13),
+        BatteryEmoji("battery_chill", "Chill", drawableRes = R.drawable.battery_14),
+        BatteryEmoji("battery_party", "Party", drawableRes = R.drawable.battery_15),
+        BatteryEmoji("battery_flame", "Flame", drawableRes = R.drawable.battery_16),
+        BatteryEmoji("battery_ghost", "Ghost", drawableRes = R.drawable.battery_17),
+        BatteryEmoji("battery_panda", "Panda", drawableRes = R.drawable.battery_18),
+        BatteryEmoji("battery_bunny", "Bunny", drawableRes = R.drawable.battery_19),
+        BatteryEmoji("battery_kitty", "Kitty", drawableRes = R.drawable.battery_20),
+        BatteryEmoji("battery_bear", "Bear", drawableRes = R.drawable.battery_21),
+        BatteryEmoji("battery_angel", "Angel", drawableRes = R.drawable.battery_22),
+        BatteryEmoji("battery_devil", "Devil", drawableRes = R.drawable.battery_23),
+        BatteryEmoji("battery_heart", "Heart", drawableRes = R.drawable.battery_24),
+        BatteryEmoji("battery_neon", "Neon", drawableRes = R.drawable.battery_25),
     )
 
     override suspend fun getToolbarStyles(): List<ToolbarStyle> = listOf(
@@ -29,7 +54,15 @@ class LocalContentDataSource @Inject constructor() : ContentDataSource {
     )
 
     override suspend fun getWallpapers(): List<WallpaperItem> = listOf(
-        WallpaperItem("wallpaper_wall1", "Dreamy Space", "Space", drawableRes = R.drawable.wall1,isPremium = true),
+        WallpaperItem("wallpaper_wall1", "Dreamy Space", "Space", drawableRes = R.drawable.img_2,isPremium = true),
+        WallpaperItem("wallpaper_wall2", "Dreamy Space", "Space", drawableRes = R.drawable.img_3,isPremium = true),
+        WallpaperItem("wallpaper_wal43", "Dreamy Space", "Space", drawableRes = R.drawable.img_4,isPremium = true),
+        WallpaperItem("wallpaper_wall5", "Dreamy Space", "Space", drawableRes = R.drawable.img_5,isPremium = true),
+        WallpaperItem("wallpaper_wall6", "Dreamy Space", "Space", drawableRes = R.drawable.img_6,isPremium = true),
+        WallpaperItem("wallpaper_wall7", "Dreamy Space", "Space", drawableRes = R.drawable.img_7,isPremium = true),
+        WallpaperItem("wallpaper_wall8", "Dreamy Space", "Space", drawableRes = R.drawable.img_8,isPremium = true),
+        WallpaperItem("wallpaper_wall9", "Dreamy Space", "Space", drawableRes = R.drawable.img_9,isPremium = true),
+        WallpaperItem("wallpaper_wall10", "Dreamy Space", "Space", drawableRes = R.drawable.wall1,isPremium = true),
         WallpaperItem("wallpaper_wall2", "Dreamy Space", "Space", drawableRes = R.drawable.wall2, isPremium = true),
         WallpaperItem("wallpaper_wall3", "Dreamy Space", "Space", drawableRes = R.drawable.wall3),
         WallpaperItem("wallpaper_space", "Dreamy Space", "Space", drawableRes = R.drawable.demo_wallpaper_space),
@@ -48,7 +81,6 @@ class LocalContentDataSource @Inject constructor() : ContentDataSource {
 
         ShimejiCharacter("shimeji_12", "Totoro", drawableRes = R.drawable.img12 ,isPremium = true),
         ShimejiCharacter("shimeji_13", "Kuromi", drawableRes = R.drawable.img13),
-        ShimejiCharacter("shimeji_14", "Melody", drawableRes = R.drawable.img14),
         ShimejiCharacter("shimeji_15", "Cinnamoroll", drawableRes = R.drawable.img15),
 
         ShimejiCharacter("shimeji_17", "Tom", drawableRes = R.drawable.img17),
@@ -66,7 +98,6 @@ class LocalContentDataSource @Inject constructor() : ContentDataSource {
         ShimejiCharacter("shimeji_29", "Minion", drawableRes = R.drawable.img29),
         ShimejiCharacter("shimeji_30", "SpongeBob", drawableRes = R.drawable.img30),
         ShimejiCharacter("shimeji_31", "Patrick Star", drawableRes = R.drawable.img31),
-        ShimejiCharacter("shimeji_32", "Panda", drawableRes = R.drawable.img32 ,isPremium = true),
         ShimejiCharacter("shimeji_33", "Cute", drawableRes = R.drawable.img33),
         ShimejiCharacter("shimeji_34", "Puppy", drawableRes = R.drawable.img34),
         ShimejiCharacter("shimeji_35", "Baby", drawableRes = R.drawable.img35 ,isPremium = true),

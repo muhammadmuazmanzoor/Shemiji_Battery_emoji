@@ -48,9 +48,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.shemiji.emogibattery.R
-import com.shemiji.emogibattery.data.model.BatteryEmoji
-import com.shemiji.emogibattery.data.model.ShimejiCharacter
-import com.shemiji.emogibattery.data.model.WallpaperItem
 import com.shemiji.emogibattery.data.model.imageModel
 import com.shemiji.emogibattery.ui.components.SpriteSheetPose
 import com.shemiji.emogibattery.ui.theme.AppFontFamily
@@ -64,6 +61,32 @@ import com.shemiji.emogibattery.ui.viewmodel.content.BatteryCustomizationViewMod
 import com.shemiji.emogibattery.ui.viewmodel.content.ShimejiViewModel
 import com.shemiji.emogibattery.ui.viewmodel.content.WallpapersViewModel
 
+data class HomeShimejiUi(
+    val id: String,
+    val name: String,
+    val drawableRes: Int? = null,
+    val imageModel: Any? = null,
+)
+
+data class HomeBatteryEmojiUi(
+    val id: String,
+    val name: String,
+    val imageModel: Any? = null,
+    val isPremium: Boolean = false,
+)
+
+data class HomeWallpaperUi(
+    val id: String,
+    val imageModel: Any? = null,
+    val isPremium: Boolean = false,
+)
+
+/**
+ * Route composable.
+ *
+ * This is the only Home composable that knows about Hilt/ViewModels.
+ * Keep navigation calling this function exactly as before.
+ */
 @Composable
 fun HomeScreen(
     onBatteryCustomization: () -> Unit,
@@ -81,12 +104,83 @@ fun HomeScreen(
     val batteryUiState by batteryViewModel.uiState.collectAsStateWithLifecycle()
     val wallpapersUiState by wallpapersViewModel.uiState.collectAsStateWithLifecycle()
 
+    // Convert feature/domain models into simple presentation-only models.
+    // HomeScreenContent now has no dependency on Hilt or any ViewModel.
+    val shimejiItems = shimejiUiState.characters.map { character ->
+        HomeShimejiUi(
+            id = character.id,
+            name = character.name,
+            drawableRes = character.drawableRes,
+            imageModel = character.imageModel(),
+        )
+    }
+
+    val batteryItems = batteryUiState.batteryEmojis.map { emoji ->
+        HomeBatteryEmojiUi(
+            id = emoji.id,
+            name = emoji.name,
+            imageModel = emoji.imageModel(),
+            isPremium = emoji.isPremium,
+        )
+    }
+
+    val wallpaperItems = wallpapersUiState.wallpapers.map { wallpaper ->
+        HomeWallpaperUi(
+            id = wallpaper.id,
+            imageModel = wallpaper.imageModel(),
+            isPremium = wallpaper.isPremium,
+        )
+    }
+
+    HomeScreenContent(
+        shimejiCharacters = shimejiItems,
+        batteryEmojis = batteryItems,
+        wallpapers = wallpaperItems,
+        onBatteryCustomization = onBatteryCustomization,
+        onWallpapers = onWallpapers,
+        onShimeji = onShimeji,
+        onShimejiCharacter = onShimejiCharacter,
+        onSettings = onSettings,
+        showAccessibilityPermission = showAccessibilityPermission,
+        onAccessibilityAgree = onAccessibilityAgree,
+        onBatteryEmojiClick = { emojiId ->
+            batteryViewModel.selectBattery(emojiId)
+            onBatteryCustomization()
+        },
+        onWallpaperClick = { wallpaperId ->
+            wallpapersViewModel.selectWallpaper(wallpaperId)
+            onWallpapers()
+        },
+    )
+}
+
+/**
+ * Pure UI/content composable.
+ *
+ * No hiltViewModel(), no collectAsStateWithLifecycle(), and no direct ViewModel calls.
+ * This is the composable used by Android Studio Preview.
+ */
+@Composable
+fun HomeScreenContent(
+    shimejiCharacters: List<HomeShimejiUi>,
+    batteryEmojis: List<HomeBatteryEmojiUi>,
+    wallpapers: List<HomeWallpaperUi>,
+    onBatteryCustomization: () -> Unit,
+    onWallpapers: () -> Unit,
+    onShimeji: () -> Unit,
+    onShimejiCharacter: (String) -> Unit,
+    onSettings: () -> Unit,
+    showAccessibilityPermission: Boolean = false,
+    onAccessibilityAgree: () -> Unit = {},
+    onBatteryEmojiClick: (String) -> Unit = {},
+    onWallpaperClick: (String) -> Unit = {},
+) {
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
             painter = painterResource(id = R.drawable.bg),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.FillBounds
+            contentScale = ContentScale.FillBounds,
         )
 
         Scaffold(
@@ -104,32 +198,34 @@ fun HomeScreen(
                     top = 6.dp,
                     bottom = 24.dp,
                 ),
-              verticalArrangement = Arrangement.spacedBy(20.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                item { 
+                item {
                     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        HomeHero(onEnableAnimation = onShimeji) 
+                        HomeHero(onEnableAnimation = onShimeji)
                     }
                 }
 
-                // Trending Shimeji
-                if (shimejiUiState.characters.isNotEmpty()) {
+                if (shimejiCharacters.isNotEmpty()) {
                     item {
                         HomeSection(
                             title = "Trending Shimeji",
                             emoji = "🔥",
-                            onSeeAll = onShimeji
+                            onSeeAll = onShimeji,
                         ) {
                             LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp)
+                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp),
                             ) {
-                                items(shimejiUiState.characters, key = { it.id }) { character ->
+                                items(
+                                    items = shimejiCharacters,
+                                    key = { it.id },
+                                ) { character ->
                                     TrendingShimejiItem(
                                         character = character,
-                                        onClick = { 
+                                        onClick = {
                                             onShimejiCharacter(character.id)
-                                        }
+                                        },
                                     )
                                 }
                             }
@@ -137,25 +233,26 @@ fun HomeScreen(
                     }
                 }
 
-                // Battery Emoji
-                if (batteryUiState.batteryEmojis.isNotEmpty()) {
+                if (batteryEmojis.isNotEmpty()) {
                     item {
                         HomeSection(
                             title = "Battery Emoji",
                             emoji = "⚡",
-                            onSeeAll = onBatteryCustomization
+                            onSeeAll = onBatteryCustomization,
                         ) {
                             LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                               contentPadding = PaddingValues(start = 16.dp, end = 16.dp)
+                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp),
                             ) {
-                                items(batteryUiState.batteryEmojis.take(5), key = { it.id }) { emoji ->
+                                items(
+                                    items = batteryEmojis.take(5),
+                                    key = { it.id },
+                                ) { emoji ->
                                     BatteryEmojiItem(
                                         emoji = emoji,
                                         onClick = {
-                                            batteryViewModel.selectBattery(emoji.id)
-                                            onBatteryCustomization()
-                                        }
+                                            onBatteryEmojiClick(emoji.id)
+                                        },
                                     )
                                 }
                             }
@@ -163,25 +260,30 @@ fun HomeScreen(
                     }
                 }
 
-                // Wallpapers
-                if (wallpapersUiState.wallpapers.isNotEmpty()) {
+                if (wallpapers.isNotEmpty()) {
                     item {
                         HomeSection(
                             title = "Wallpapers",
                             emoji = "🖼️",
-                            onSeeAll = onWallpapers
+                            onSeeAll = onWallpapers,
                         ) {
                             LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 4.dp)
+                                contentPadding = PaddingValues(
+                                    start = 16.dp,
+                                    end = 16.dp,
+                                    bottom = 4.dp,
+                                ),
                             ) {
-                                items(wallpapersUiState.wallpapers.take(5), key = { it.id }) { wallpaper ->
+                                items(
+                                    items = wallpapers.take(5),
+                                    key = { it.id },
+                                ) { wallpaper ->
                                     WallpaperHomeItem(
                                         wallpaper = wallpaper,
                                         onClick = {
-                                            wallpapersViewModel.selectWallpaper(wallpaper.id)
-                                            onWallpapers()
-                                        }
+                                            onWallpaperClick(wallpaper.id)
+                                        },
                                     )
                                 }
                             }
@@ -214,7 +316,7 @@ private fun HomeSection(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(emoji, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-               // Spacer(Modifier.width(2.dp))
+                // Spacer(Modifier.width(2.dp))
                 Text(
                     text = title,
                     fontSize = 14.sp,
@@ -245,7 +347,7 @@ private fun HomeSection(
                 )
             }
         }
-        
+
         Spacer(Modifier.height(6.dp))
         content()
     }
@@ -401,7 +503,7 @@ private fun HomeHero(onEnableAnimation: () -> Unit) {
                     lineHeight = 10.sp
                 )
             )
-            
+
             Spacer(modifier = Modifier.height(8.dp))
 
             Box(
@@ -441,8 +543,8 @@ private fun HomeHero(onEnableAnimation: () -> Unit) {
 
 @Composable
 private fun TrendingShimejiItem(
-    character: ShimejiCharacter,
-    onClick: () -> Unit
+    character: HomeShimejiUi,
+    onClick: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -452,19 +554,19 @@ private fun TrendingShimejiItem(
             .background(Color(0xFFFEF3F7))
             .border(0.5.dp, Color(0xFFFCE5F1), RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(3.dp)
+            .padding(3.dp),
     ) {
         Image(
             painter = painterResource(id = R.drawable.heart),
             contentDescription = null,
             modifier = Modifier
                 .size(20.dp)
-                .align(Alignment.TopEnd)
+                .align(Alignment.TopEnd),
         )
 
         Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             character.drawableRes?.let { drawableRes ->
                 SpriteSheetPose(
@@ -477,10 +579,13 @@ private fun TrendingShimejiItem(
                         .padding(top = 4.dp, start = 4.dp, end = 4.dp),
                 )
             } ?: AsyncImage(
-                model = character.imageModel(),
+                model = character.imageModel,
                 contentDescription = character.name,
-                modifier = Modifier.width(78.dp).height(88.dp),
+                modifier = Modifier
+                    .width(78.dp)
+                    .height(88.dp),
             )
+
             Box(
                 modifier = Modifier
                     .width(78.dp)
@@ -505,8 +610,8 @@ private fun TrendingShimejiItem(
 
 @Composable
 private fun BatteryEmojiItem(
-    emoji: BatteryEmoji,
-    onClick: () -> Unit
+    emoji: HomeBatteryEmojiUi,
+    onClick: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -514,48 +619,52 @@ private fun BatteryEmojiItem(
             .clip(RoundedCornerShape(12.dp))
             .background(Color(0xFFEEE5FC))
             .clickable(onClick = onClick)
-            .border(color = neutral200, width = 0.5.dp, shape = RoundedCornerShape(12.dp))
+            .border(
+                color = neutral200,
+                width = 0.5.dp,
+                shape = RoundedCornerShape(12.dp),
+            )
             .padding(top = 4.dp, start = 4.dp, end = 4.dp),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         AsyncImage(
-            model = emoji.imageModel(),
-            contentDescription = null,
-            modifier = Modifier.fillMaxWidth()
-                .height(54.dp)
+            model = emoji.imageModel,
+            contentDescription = emoji.name,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp),
         )
-        if(emoji.isPremium) {
+
+        if (emoji.isPremium) {
             Image(
                 painter = painterResource(R.drawable.pro_ic),
                 contentDescription = null,
                 modifier = Modifier
                     .size(20.dp)
                     .align(Alignment.TopEnd)
-                    .buttonShadow()
+                    .buttonShadow(),
             )
         }
-
     }
 }
 
 @Composable
 private fun WallpaperHomeItem(
-    wallpaper: WallpaperItem,
-    onClick: () -> Unit
+    wallpaper: HomeWallpaperUi,
+    onClick: () -> Unit,
 ) {
     Box(
         modifier = Modifier
             .width(96.dp)
             .height(126.dp)
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-
+            .clickable(onClick = onClick),
     ) {
         AsyncImage(
-            model = wallpaper.imageModel(),
+            model = wallpaper.imageModel,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Crop,
         )
 
         if (wallpaper.isPremium) {
@@ -566,20 +675,102 @@ private fun WallpaperHomeItem(
                     .padding(4.dp)
                     .size(18.dp)
                     .align(Alignment.TopEnd)
-                    .buttonShadow()
+                    .buttonShadow(),
             )
         }
     }
 }
 
-@Preview
+@Preview(
+    name = "Home Screen",
+    showBackground = true,
+    widthDp = 360,
+    heightDp = 800,
+)
 @Composable
-fun displayHomeScreen() {
-    HomeScreen(
+private fun HomeScreenPreview() {
+    HomeScreenContent(
+        shimejiCharacters = listOf(
+            HomeShimejiUi(
+                id = "preview_shimeji_1",
+                name = "Mochi",
+                imageModel = R.drawable.banner_image,
+            ),
+            HomeShimejiUi(
+                id = "preview_shimeji_2",
+                name = "Bunny",
+                imageModel = R.drawable.heart,
+            ),
+            HomeShimejiUi(
+                id = "preview_shimeji_3",
+                name = "Koko",
+                imageModel = R.drawable.banner_image,
+            ),
+            HomeShimejiUi(
+                id = "preview_shimeji_4",
+                name = "Neko",
+                imageModel = R.drawable.heart,
+            ),
+        ),
+        batteryEmojis = listOf(
+            HomeBatteryEmojiUi(
+                id = "preview_battery_1",
+                name = "Fury",
+                imageModel = R.drawable.battery1,
+                isPremium = true,
+            ),
+            HomeBatteryEmojiUi(
+                id = "preview_battery_2",
+                name = "Rage",
+                imageModel = R.drawable.battery2,
+                isPremium = true,
+            ),
+            HomeBatteryEmojiUi(
+                id = "preview_battery_3",
+                name = "Glam",
+                imageModel = R.drawable.battery3,
+            ),
+            HomeBatteryEmojiUi(
+                id = "preview_battery_4",
+                name = "Happy",
+                imageModel = R.drawable.demo_battery_happy,
+            ),
+            HomeBatteryEmojiUi(
+                id = "preview_battery_5",
+                name = "Love",
+                imageModel = R.drawable.demo_battery_love,
+            ),
+        ),
+        wallpapers = listOf(
+            HomeWallpaperUi(
+                id = "preview_wallpaper_1",
+                imageModel = R.drawable.bg,
+            ),
+            HomeWallpaperUi(
+                id = "preview_wallpaper_2",
+                imageModel = R.drawable.banner_image,
+                isPremium = true,
+            ),
+            HomeWallpaperUi(
+                id = "preview_wallpaper_3",
+                imageModel = R.drawable.bg,
+            ),
+            HomeWallpaperUi(
+                id = "preview_wallpaper_4",
+                imageModel = R.drawable.banner_image,
+                isPremium = true,
+            ),
+            HomeWallpaperUi(
+                id = "preview_wallpaper_5",
+                imageModel = R.drawable.bg,
+            ),
+        ),
         onBatteryCustomization = {},
         onWallpapers = {},
         onShimeji = {},
         onShimejiCharacter = {},
         onSettings = {},
+        onBatteryEmojiClick = {},
+        onWallpaperClick = {},
     )
 }

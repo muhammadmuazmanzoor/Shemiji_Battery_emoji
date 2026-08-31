@@ -39,12 +39,11 @@ import coil.load
 import com.shemiji.emogibattery.MainActivity
 import com.shemiji.emogibattery.R
 import java.util.Date
-import java.util.Locale
 import kotlin.math.hypot
 import kotlin.math.sqrt
 import kotlin.math.roundToInt
 
-class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.OnSharedPreferenceChangeListener, SensorEventListener {
+class OverlayAccessibilityService : AccessibilityService(), SensorEventListener {
 
     companion object {
         const val ACTION_UPDATE_BATTERY = "com.shemiji.emogibattery.UPDATE_BATTERY_OVERLAY"
@@ -63,9 +62,12 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
         const val EXTRA_CHARACTER_NAME = "character_name"
         const val EXTRA_MOVEMENT_SPEED = "movement_speed"
         const val EXTRA_CHARACTER_SIZE_DP = "character_size_dp"
+        private const val EXTRA_DRAWABLE_NAME = "drawable_name"
         private const val ICON_HOLD_MS = 650L
         private const val DRAG_SLOP_DP = 12
         private const val SEAT_FEET_FRACTION = 0.72f
+        private const val SPRITE_COLUMNS = 4
+        private const val SPRITE_ROWS = 8
         private const val SHAKE_THRESHOLD_G = 2.2f
         private const val SHAKE_COOLDOWN_MS = 900L
         var isServiceConnected = false
@@ -77,6 +79,7 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
     private lateinit var windowManager: WindowManager
     private var batteryOverlayView: View? = null
     private var batteryText: TextView? = null
+    private var timeText: TextView? = null
     private var receiverRegistered = false
     private var commandReceiverRegistered = false
     private var shimejiView: SpriteView? = null
@@ -113,21 +116,24 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
                         .putInt(EXTRA_HEIGHT, intent.getIntExtra(EXTRA_HEIGHT, 34))
                         .putInt(EXTRA_LEFT_MARGIN, intent.getIntExtra(EXTRA_LEFT_MARGIN, 16))
                         .putInt(EXTRA_RIGHT_MARGIN, intent.getIntExtra(EXTRA_RIGHT_MARGIN, 16)).apply()
-                    checkAndRestartServices(true)
+                    refreshBatteryOverlay(force = true)
                 }
                 ACTION_STOP_BATTERY -> {
                     getSharedPreferences("battery_overlay_runtime", MODE_PRIVATE).edit().putBoolean("is_enabled", false).apply()
                     removeBatteryAccessibilityOverlay()
                 }
                 ACTION_UPDATE_SHIMEJI -> {
+                    val drawableRes = intent.getIntExtra(EXTRA_DRAWABLE_RES, R.drawable.img_1)
+                    val drawableName = runCatching { resources.getResourceEntryName(drawableRes) }.getOrNull()
                     getSharedPreferences("shimeji_overlay_runtime", MODE_PRIVATE).edit()
                         .putBoolean("is_enabled", true)
-                        .putInt(EXTRA_DRAWABLE_RES, intent.getIntExtra(EXTRA_DRAWABLE_RES, R.drawable.img_1))
+                        .putInt(EXTRA_DRAWABLE_RES, drawableRes)
+                        .putString(EXTRA_DRAWABLE_NAME, drawableName)
                         .putString(EXTRA_IMAGE_URL, intent.getStringExtra(EXTRA_IMAGE_URL))
                         .putString(EXTRA_CHARACTER_NAME, intent.getStringExtra(EXTRA_CHARACTER_NAME))
                         .putFloat(EXTRA_MOVEMENT_SPEED, intent.getFloatExtra(EXTRA_MOVEMENT_SPEED, 1f))
                         .putInt(EXTRA_CHARACTER_SIZE_DP, intent.getIntExtra(EXTRA_CHARACTER_SIZE_DP, 112)).apply()
-                    checkAndRestartServices(true)
+                    refreshShimejiOverlay(force = true)
                 }
                 ACTION_STOP_SHIMEJI -> {
                     getSharedPreferences("shimeji_overlay_runtime", MODE_PRIVATE).edit().putBoolean("is_enabled", false).apply()
@@ -156,10 +162,9 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            val level = intent?.getIntExtra("level", -1) ?: -1
-            val scale = intent?.getIntExtra("scale", 100) ?: 100
-            if (level >= 0 && scale > 0) {
-                batteryText?.text = "${(level * 100f / scale).roundToInt()}%"
+            when (intent?.action) {
+                Intent.ACTION_BATTERY_CHANGED -> updateBatteryText(intent)
+                Intent.ACTION_TIME_TICK, Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED -> updateTimeText()
             }
         }
     }
@@ -197,25 +202,14 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         
-        // Listen for style updates in real-time
-        getSharedPreferences("battery_overlay_runtime", MODE_PRIVATE)
-            .registerOnSharedPreferenceChangeListener(this)
-            
         checkAndRestartServices()
         registerBatteryReceiver()
         registerCommandReceiver()
     }
 
-    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
-        // When any style or enable/disable key changes, refresh the overlays
-        checkAndRestartServices(forceRefresh = true)
-    }
-
     override fun onDestroy() {
         super.onDestroy()
         isServiceConnected = false
-        getSharedPreferences("battery_overlay_runtime", MODE_PRIVATE)
-            .unregisterOnSharedPreferenceChangeListener(this)
         removeBatteryAccessibilityOverlay()
         removeShimejiAccessibilityOverlay()
         if (receiverRegistered) {
@@ -226,16 +220,22 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
     }
 
     private fun checkAndRestartServices(forceRefresh: Boolean = false) {
+        refreshBatteryOverlay(forceRefresh)
+        refreshShimejiOverlay(forceRefresh)
+    }
+
+    private fun refreshBatteryOverlay(force: Boolean = false) {
         val batteryPrefs = getSharedPreferences("battery_overlay_runtime", MODE_PRIVATE)
         if (batteryPrefs.getBoolean("is_enabled", false)) {
-            ensureBatteryAccessibilityOverlayShown(batteryPrefs, forceRefresh)
-            
+            ensureBatteryAccessibilityOverlayShown(batteryPrefs, force)
         } else {
             removeBatteryAccessibilityOverlay()
         }
+    }
 
+    private fun refreshShimejiOverlay(force: Boolean = false) {
         val shimejiPrefs = getSharedPreferences("shimeji_overlay_runtime", MODE_PRIVATE)
-        if (shimejiPrefs.getBoolean("is_enabled", false)) ensureShimejiAccessibilityOverlayShown(shimejiPrefs, forceRefresh)
+        if (shimejiPrefs.getBoolean("is_enabled", false)) ensureShimejiAccessibilityOverlayShown(shimejiPrefs, force)
         else removeShimejiAccessibilityOverlay()
     }
 
@@ -278,13 +278,14 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
         }
 
         val timeView = TextView(this).apply {
-            text = java.text.SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
             setTextColor(contentColor)
             textSize = 18f
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             includeFontPadding = false
             setPadding(0, 0, dp(6), 0)
         }
+        timeText = timeView
+        updateTimeText()
         container.addView(timeView)
 
         val emojiView = ImageView(this).apply {
@@ -330,13 +331,7 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
         val batteryStatus: Intent? = IntentFilter(Intent.ACTION_BATTERY_CHANGED).let { filter ->
             registerReceiver(null, filter)
         }
-        batteryStatus?.let { intent ->
-            val level = intent.getIntExtra("level", -1)
-            val scale = intent.getIntExtra("scale", 100)
-            if (level >= 0 && scale > 0) {
-                batteryText?.text = "${(level * 100f / scale).roundToInt()}%"
-            }
-        }
+        batteryStatus?.let(::updateBatteryText)
         
         statusIcons.addView(batteryText)
         container.addView(statusIcons)
@@ -366,43 +361,52 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
         } catch (t: Throwable) {
             Log.w("OverlayAccessibility", "Failed to add accessibility overlay", t)
             batteryOverlayView = null
+            batteryText = null
+            timeText = null
             hasActiveOverlay = false
         }
     }
 
     private fun registerBatteryReceiver() {
         if (receiverRegistered) return
-        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_BATTERY_CHANGED)
+            addAction(Intent.ACTION_TIME_TICK)
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+        }
         val stickyIntent = ContextCompat.registerReceiver(
             this,
             batteryReceiver,
             filter,
-            ContextCompat.RECEIVER_NOT_EXPORTED,
+            ContextCompat.RECEIVER_EXPORTED,
         )
-        // Initial update from sticky intent
-        stickyIntent?.let { intent ->
-            val level = intent.getIntExtra("level", -1)
-            val scale = intent.getIntExtra("scale", 100)
-            if (level >= 0 && scale > 0) {
-                batteryText?.text = "${(level * 100f / scale).roundToInt()}%"
-            }
-        }
+        stickyIntent?.takeIf { it.action == Intent.ACTION_BATTERY_CHANGED }?.let(::updateBatteryText)
+        updateTimeText()
         receiverRegistered = true
     }
 
+    private fun updateBatteryText(intent: Intent) {
+        val level = intent.getIntExtra("level", -1)
+        val scale = intent.getIntExtra("scale", 100)
+        if (level >= 0 && scale > 0) batteryText?.text = "${(level * 100f / scale).roundToInt()}%"
+    }
+
+    private fun updateTimeText() {
+        timeText?.text = android.text.format.DateFormat.getTimeFormat(this).format(Date())
+    }
+
     private fun removeBatteryAccessibilityOverlay() {
-        hasActiveOverlay = false
-        batteryOverlayView?.let { view ->
-            try {
-                if (view.isAttachedToWindow) {
-                    windowManager.removeView(view)
-                }
-                Log.d("OverlayAccessibility", "Removed battery accessibility overlay pid=${android.os.Process.myPid()} time=${System.currentTimeMillis()}")
-            } catch (t: Throwable) {
-                Log.w("OverlayAccessibility", "Failed to remove accessibility overlay", t)
-            }
-        }
+        val view = batteryOverlayView
         batteryOverlayView = null
+        batteryText = null
+        timeText = null
+        view?.let {
+            runCatching { windowManager.removeViewImmediate(it) }
+                .onSuccess { Log.d("OverlayAccessibility", "Removed battery accessibility overlay pid=${android.os.Process.myPid()} time=${System.currentTimeMillis()}") }
+                .onFailure { Log.w("OverlayAccessibility", "Failed to remove accessibility overlay", it) }
+        }
+        hasActiveOverlay = shimejiView != null
     }
 
     private fun registerCommandReceiver() {
@@ -422,8 +426,24 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
         val engine = ShimejiPhysicsEngine().apply {
             configure(metrics.widthPixels, metrics.heightPixels, size, dp(48), prefs.getFloat("movement_speed", 1f))
         }
-        val drawable = prefs.getInt("drawable_res", R.drawable.img_1).takeIf { it != 0 } ?: R.drawable.img_1
-        val view = SpriteView(this, drawable).apply {
+        val storedName = prefs.getString(EXTRA_DRAWABLE_NAME, null)
+        val storedDrawable = storedName?.let { resources.getIdentifier(it, "drawable", packageName).takeIf { id -> id != 0 } }
+            ?: prefs.getInt(EXTRA_DRAWABLE_RES, R.drawable.img_1).takeIf { it != 0 }
+            ?: R.drawable.img_1
+        val requestedBitmap = decodeSpriteBitmap(storedDrawable)
+        val bitmap = requestedBitmap ?: decodeSpriteBitmap(R.drawable.img_1)
+        if (bitmap == null) {
+            Log.e("OverlayAccessibility", "Unable to decode selected Shimeji or fallback sprite sheet")
+            return
+        }
+        if (requestedBitmap == null) {
+            Log.w("OverlayAccessibility", "Invalid persisted Shimeji drawable id=$storedDrawable; using img_1 fallback")
+            prefs.edit()
+                .putInt(EXTRA_DRAWABLE_RES, R.drawable.img_1)
+                .putString(EXTRA_DRAWABLE_NAME, resources.getResourceEntryName(R.drawable.img_1))
+                .apply()
+        }
+        val view = SpriteView(this, bitmap).apply {
             setOnTouchListener { _, event ->
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
@@ -490,13 +510,21 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
         unregisterShakeSensor()
         touchActive = false; dragActive = false; pressedWhileSitting = false
         animationHandler.removeCallbacks(animationTick)
-        shimejiView?.let { runCatching { if (it.isAttachedToWindow) windowManager.removeView(it) } }
+        shimejiView?.let { runCatching { windowManager.removeViewImmediate(it) } }
         shimejiView = null; shimejiParams = null; physics = null
         hasActiveOverlay = batteryOverlayView != null
     }
 
-    private class SpriteView(context: Context, drawableRes: Int) : View(context) {
-        private val bitmap: Bitmap = BitmapFactory.decodeResource(resources, drawableRes, BitmapFactory.Options().apply { inScaled = false })
+    private fun decodeSpriteBitmap(drawableRes: Int): Bitmap? = runCatching {
+        val resourceType = resources.getResourceTypeName(drawableRes)
+        if (resourceType != "drawable" && resourceType != "mipmap") return@runCatching null
+        BitmapFactory.decodeResource(resources, drawableRes, BitmapFactory.Options().apply { inScaled = false })
+            ?.takeIf { it.width >= SPRITE_COLUMNS && it.height >= SPRITE_ROWS }
+    }.onFailure {
+        Log.w("OverlayAccessibility", "Failed to decode Shimeji drawable id=$drawableRes", it)
+    }.getOrNull()
+
+    private class SpriteView(context: Context, private val bitmap: Bitmap) : View(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         var motion: ShimejiMotion = ShimejiMotion.IDLE
         override fun onDraw(canvas: Canvas) {
@@ -515,11 +543,17 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
                 ShimejiMotion.SITTING -> 3
                 else -> phase
             }
-            val src = Rect(col * bitmap.width / 4, row * bitmap.height / 8, (col + 1) * bitmap.width / 4, (row + 1) * bitmap.height / 8)
+            val src = Rect(col * bitmap.width / SPRITE_COLUMNS, row * bitmap.height / SPRITE_ROWS,
+                (col + 1) * bitmap.width / SPRITE_COLUMNS, (row + 1) * bitmap.height / SPRITE_ROWS)
             val flip = motion in setOf(ShimejiMotion.WALKING_LEFT, ShimejiMotion.CLIMBING_RIGHT, ShimejiMotion.JUMPING_RIGHT_TO_LEFT, ShimejiMotion.TOP_WALKING_LEFT)
             if (flip) { canvas.save(); canvas.scale(-1f, 1f, width / 2f, height / 2f) }
             canvas.drawBitmap(bitmap, src, Rect(0, 0, width, height), paint)
             if (flip) canvas.restore()
+        }
+
+        override fun onDetachedFromWindow() {
+            super.onDetachedFromWindow()
+            if (!bitmap.isRecycled) bitmap.recycle()
         }
     }
 
