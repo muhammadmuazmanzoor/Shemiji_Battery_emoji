@@ -167,6 +167,9 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
     private var lastRestartTime = 0L
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            releaseSeatWhenLauncherLeavesForeground(event.packageName?.toString())
+        }
         val now = System.currentTimeMillis()
         // Window state changes happen often, throttle checks
         if (now - lastRestartTime < 2000) return 
@@ -545,6 +548,9 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
 
     private fun findAppIconBounds(engine: ShimejiPhysicsEngine, characterSize: Int): Rect? {
         val homePackage = resolveDefaultHomePackage()
+        // Never match a launcher icon hidden behind a browser or another foreground app.
+        val foregroundPackage = foregroundApplicationPackage()
+        if (homePackage != null && foregroundPackage != homePackage) return null
         val roots = windows.asSequence()
             .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
             .sortedByDescending { it.layer }
@@ -566,6 +572,26 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
         }
         return null
     }
+
+    private fun releaseSeatWhenLauncherLeavesForeground(eventPackage: String?) {
+        val engine = physics ?: return
+        if (engine.motion != ShimejiMotion.SITTING) return
+        val homePackage = resolveDefaultHomePackage() ?: return
+        val foregroundPackage = foregroundApplicationPackage() ?: eventPackage
+        if (foregroundPackage == null || foregroundPackage == packageName || foregroundPackage == homePackage) return
+        cancelIconHold()
+        unregisterShakeSensor()
+        touchActive = false
+        dragActive = false
+        pressedWhileSitting = false
+        engine.releaseFromSeat()
+    }
+
+    private fun foregroundApplicationPackage(): String? = windows.asSequence()
+        .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+        .sortedByDescending { it.layer }
+        .mapNotNull { it.root?.packageName?.toString() }
+        .firstOrNull { it != packageName }
 
     private fun findIconNodeAt(node: AccessibilityNodeInfo, x: Int, y: Int): Rect? {
         val bounds = Rect().also { node.getBoundsInScreen(it) }
