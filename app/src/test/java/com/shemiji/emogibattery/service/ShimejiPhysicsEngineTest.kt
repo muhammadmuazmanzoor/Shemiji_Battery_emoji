@@ -50,4 +50,65 @@ class ShimejiPhysicsEngineTest {
         assertTrue(fast.x <= 360f)
         assertTrue(fast.y <= 760f)
     }
+
+    @Test fun sittingStaysPinnedUntilShakeReleaseThenFalls() {
+        val engine = ShimejiPhysicsEngine()
+        engine.configure(600, 1_000, 100, 0, 1f)
+        engine.sitAt(210f, 340f)
+
+        repeat(100) { engine.tick(50) }
+        assertEquals(ShimejiMotion.SITTING, engine.motion)
+        assertEquals(210f, engine.x, 0.01f)
+        assertEquals(340f, engine.y, 0.01f)
+
+        engine.releaseFromSeat()
+        assertEquals(ShimejiMotion.FALLING, engine.motion)
+        engine.tick(50)
+        assertTrue(engine.y > 340f)
+    }
+
+    @Test fun seatedCharacterCanBePickedUpWithoutJumpingOrFalling() {
+        val engine = ShimejiPhysicsEngine()
+        engine.configure(600, 1_000, 100, 0, 1f)
+        engine.sitAt(210f, 340f)
+
+        engine.beginDragFromSeat()
+
+        assertTrue(engine.isDragging)
+        assertEquals(ShimejiMotion.IDLE, engine.motion)
+        assertEquals(ScreenEdge.NONE, engine.edge)
+        assertEquals(210f, engine.x, 0.01f)
+        assertEquals(340f, engine.y, 0.01f)
+        engine.tick(50)
+        assertEquals(340f, engine.y, 0.01f)
+    }
+
+    @Test fun releasingPickedUpSeatInMiddleUsesExistingFallFlow() {
+        val engine = ShimejiPhysicsEngine()
+        engine.configure(600, 1_000, 100, 0, 1f)
+        engine.sitAt(210f, 340f)
+        engine.beginDragFromSeat()
+        engine.dragTo(250f, 300f)
+
+        engine.endDrag()
+
+        assertEquals(ShimejiMotion.FALLING, engine.motion)
+        assertEquals(ScreenEdge.NONE, engine.edge)
+        engine.tick(50)
+        assertTrue(engine.y > 300f)
+    }
+
+    @Test fun releasingPickedUpSeatNearBottomUsesExistingWalkFlow() {
+        val engine = ShimejiPhysicsEngine()
+        engine.configure(600, 1_000, 100, 0, 1f)
+        engine.sitAt(210f, 340f)
+        engine.beginDragFromSeat()
+        engine.dragTo(250f, 880f)
+
+        engine.endDrag()
+
+        assertEquals(ScreenEdge.BOTTOM, engine.edge)
+        assertEquals(900f, engine.y, 0.01f)
+        assertEquals(ShimejiMotion.WALKING_RIGHT, engine.motion)
+    }
 }

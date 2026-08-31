@@ -11,7 +11,7 @@ import kotlin.random.Random
 enum class ShimejiMotion {
     WALKING_LEFT, WALKING_RIGHT, CLIMBING_LEFT, JUMPING_LEFT_TO_RIGHT,
     CLIMBING_RIGHT, JUMPING_RIGHT_TO_LEFT, FALLING, BOUNCING,
-    TOP_WALKING_LEFT, TOP_WALKING_RIGHT, IDLE,
+    TOP_WALKING_LEFT, TOP_WALKING_RIGHT, SITTING, IDLE,
 }
 
 enum class ScreenEdge { TOP, RIGHT, BOTTOM, LEFT, NONE }
@@ -42,10 +42,22 @@ class ShimejiPhysicsEngine(@Suppress("UNUSED_PARAMETER") random: Random = Random
     fun restore(savedX: Float, savedY: Float, savedMotion: ShimejiMotion, savedEdge: ScreenEdge) {
         x = savedX.coerceIn(0f, maxX); y = savedY.coerceIn(0f, maxY)
         motion = savedMotion; edge = savedEdge
-        if (motion == ShimejiMotion.FALLING || edge == ScreenEdge.NONE) startFalling() else snapTo(edge)
+        if (motion == ShimejiMotion.FALLING || motion == ShimejiMotion.SITTING || edge == ScreenEdge.NONE) startFalling() else snapTo(edge)
     }
 
     fun beginDrag() { isDragging = true; verticalVelocity = 0f }
+
+    /** Picks up a seated character without applying gravity or changing its position. */
+    fun beginDragFromSeat() {
+        if (motion != ShimejiMotion.SITTING) {
+            beginDrag()
+            return
+        }
+        isDragging = true
+        verticalVelocity = 0f
+        edge = ScreenEdge.NONE
+        motion = ShimejiMotion.IDLE
+    }
     fun dragTo(newX: Float, newY: Float) {
         x = newX.coerceIn(0f, maxX); y = newY.coerceIn(0f, maxY); edge = ScreenEdge.NONE
     }
@@ -65,6 +77,20 @@ class ShimejiPhysicsEngine(@Suppress("UNUSED_PARAMETER") random: Random = Random
         }
     }
 
+    /** Pins the character to a launcher icon until a shake releases it. */
+    fun sitAt(seatX: Float, seatY: Float) {
+        isDragging = false
+        x = seatX.coerceIn(0f, maxX)
+        y = seatY.coerceIn(0f, maxY)
+        edge = ScreenEdge.NONE
+        verticalVelocity = 0f
+        motion = ShimejiMotion.SITTING
+    }
+
+    fun releaseFromSeat() {
+        if (motion == ShimejiMotion.SITTING) startFalling()
+    }
+
     fun tick(deltaMs: Long) {
         if (isDragging || maxX <= 0f || maxY <= 0f) return
         val dtMs = deltaMs.coerceIn(0L, 50L); val distance = speed * dtMs / 1_000f
@@ -79,6 +105,7 @@ class ShimejiPhysicsEngine(@Suppress("UNUSED_PARAMETER") random: Random = Random
             ShimejiMotion.TOP_WALKING_RIGHT -> { edge = ScreenEdge.TOP; y = 0f; x += distance; if (x >= maxX) { x = maxX; startFalling() } }
             ShimejiMotion.FALLING -> updateFall(dtMs)
             ShimejiMotion.BOUNCING -> updateBounce(dtMs)
+            ShimejiMotion.SITTING -> Unit
             ShimejiMotion.IDLE -> motion = ShimejiMotion.WALKING_LEFT
         }
     }

@@ -15,5 +15,5 @@
     <string name="rewarded_home">ca-app-pub-3940256099942544/5224354917</string>
     <string name="app_open">ca-app-pub-3940256099942544/9257395921</string>
     <string name="ad_loading">Ad is loading…</string>
-    <string name="accessibility_description">Used to ensure the battery toolbar and Shimeji animations stay on top of other apps and remain active.</string>
+    <string name="accessibility_description">Keeps overlays visible and detects the app icon beneath a held Shimeji so it can sit there.</string>
 </resources>

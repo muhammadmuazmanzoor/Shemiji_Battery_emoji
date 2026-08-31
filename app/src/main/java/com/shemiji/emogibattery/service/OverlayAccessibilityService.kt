@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -14,6 +15,10 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -24,6 +29,8 @@ import android.view.View
 import android.view.MotionEvent
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -33,9 +40,11 @@ import com.shemiji.emogibattery.MainActivity
 import com.shemiji.emogibattery.R
 import java.util.Date
 import java.util.Locale
+import kotlin.math.hypot
+import kotlin.math.sqrt
 import kotlin.math.roundToInt
 
-class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.OnSharedPreferenceChangeListener {
+class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.OnSharedPreferenceChangeListener, SensorEventListener {
 
     companion object {
         const val ACTION_UPDATE_BATTERY = "com.shemiji.emogibattery.UPDATE_BATTERY_OVERLAY"
@@ -54,6 +63,11 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
         const val EXTRA_CHARACTER_NAME = "character_name"
         const val EXTRA_MOVEMENT_SPEED = "movement_speed"
         const val EXTRA_CHARACTER_SIZE_DP = "character_size_dp"
+        private const val ICON_HOLD_MS = 650L
+        private const val DRAG_SLOP_DP = 12
+        private const val SEAT_FEET_FRACTION = 0.72f
+        private const val SHAKE_THRESHOLD_G = 2.2f
+        private const val SHAKE_COOLDOWN_MS = 900L
         var isServiceConnected = false
             private set
         var hasActiveOverlay = false
@@ -72,6 +86,17 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
     private var lastFrameAt = 0L
     private var touchOffsetX = 0f
     private var touchOffsetY = 0f
+    private var holdStartX = 0f
+    private var holdStartY = 0f
+    private var latestTouchX = 0f
+    private var latestTouchY = 0f
+    private var pendingIconHold: Runnable? = null
+    private var touchActive = false
+    private var dragActive = false
+    private var pressedWhileSitting = false
+    private lateinit var sensorManager: SensorManager
+    private var shakeSensorRegistered = false
+    private var lastShakeAt = 0L
 
     private val commandReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -167,6 +192,7 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
         Log.d("OverlayAccessibility", "Service connected")
         isServiceConnected = true
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         
         // Listen for style updates in real-time
         getSharedPreferences("battery_overlay_runtime", MODE_PRIVATE)
@@ -397,9 +423,51 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
         val view = SpriteView(this, drawable).apply {
             setOnTouchListener { _, event ->
                 when (event.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> { engine.beginDrag(); touchOffsetX = event.rawX - engine.x; touchOffsetY = event.rawY - engine.y; true }
-                    MotionEvent.ACTION_MOVE -> { engine.dragTo(event.rawX - touchOffsetX, event.rawY - touchOffsetY); true }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { engine.endDrag(); true }
+                    MotionEvent.ACTION_DOWN -> {
+                        cancelIconHold()
+                        touchActive = true
+                        dragActive = false
+                        pressedWhileSitting = engine.motion == ShimejiMotion.SITTING
+                        touchOffsetX = event.rawX - engine.x; touchOffsetY = event.rawY - engine.y
+                        holdStartX = event.rawX; holdStartY = event.rawY
+                        latestTouchX = event.rawX; latestTouchY = event.rawY
+                        if (pressedWhileSitting) {
+                            unregisterShakeSensor()
+                        } else {
+                            engine.beginDrag()
+                            dragActive = true
+                            scheduleIconHold(engine, size)
+                        }
+                        true
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        latestTouchX = event.rawX; latestTouchY = event.rawY
+                        val moved = hypot(event.rawX - holdStartX, event.rawY - holdStartY)
+                        if (pressedWhileSitting && !dragActive && moved > dp(DRAG_SLOP_DP)) {
+                            cancelIconHold()
+                            unregisterShakeSensor()
+                            engine.beginDragFromSeat()
+                            dragActive = true
+                            pressedWhileSitting = false
+                        }
+                        if (dragActive) {
+                            engine.dragTo(event.rawX - touchOffsetX, event.rawY - touchOffsetY)
+                            if (moved > dp(DRAG_SLOP_DP)) {
+                                holdStartX = event.rawX; holdStartY = event.rawY
+                                scheduleIconHold(engine, size)
+                            }
+                        }
+                        true
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        cancelIconHold()
+                        if (dragActive && engine.isDragging) engine.endDrag()
+                        else if (engine.motion == ShimejiMotion.SITTING) registerShakeSensor()
+                        touchActive = false
+                        dragActive = false
+                        pressedWhileSitting = false
+                        true
+                    }
                     else -> false
                 }
             }
@@ -415,6 +483,9 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
     }
 
     private fun removeShimejiAccessibilityOverlay() {
+        cancelIconHold()
+        unregisterShakeSensor()
+        touchActive = false; dragActive = false; pressedWhileSitting = false
         animationHandler.removeCallbacks(animationTick)
         shimejiView?.let { runCatching { if (it.isAttachedToWindow) windowManager.removeView(it) } }
         shimejiView = null; shimejiParams = null; physics = null
@@ -433,9 +504,14 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
                 ShimejiMotion.JUMPING_LEFT_TO_RIGHT, ShimejiMotion.JUMPING_RIGHT_TO_LEFT -> 3
                 ShimejiMotion.TOP_WALKING_LEFT, ShimejiMotion.TOP_WALKING_RIGHT -> 6
                 ShimejiMotion.FALLING, ShimejiMotion.BOUNCING -> 7
+                ShimejiMotion.SITTING -> 7
                 else -> 0
             }
-            val col = if (motion == ShimejiMotion.BOUNCING) 2 else phase
+            val col = when (motion) {
+                ShimejiMotion.BOUNCING -> 2
+                ShimejiMotion.SITTING -> 3
+                else -> phase
+            }
             val src = Rect(col * bitmap.width / 4, row * bitmap.height / 8, (col + 1) * bitmap.width / 4, (row + 1) * bitmap.height / 8)
             val flip = motion in setOf(ShimejiMotion.WALKING_LEFT, ShimejiMotion.CLIMBING_RIGHT, ShimejiMotion.JUMPING_RIGHT_TO_LEFT, ShimejiMotion.TOP_WALKING_LEFT)
             if (flip) { canvas.save(); canvas.scale(-1f, 1f, width / 2f, height / 2f) }
@@ -443,6 +519,107 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
             if (flip) canvas.restore()
         }
     }
+
+    private fun scheduleIconHold(engine: ShimejiPhysicsEngine, characterSize: Int) {
+        cancelIconHold()
+        pendingIconHold = Runnable {
+            pendingIconHold = null
+            if (!touchActive || !dragActive || physics !== engine || !engine.isDragging) return@Runnable
+            val bounds = findAppIconBounds(engine, characterSize) ?: return@Runnable
+            val seatX = bounds.exactCenterX() - characterSize / 2f
+            // Put the feet on the upper portion of the icon so its label remains readable.
+            val seatY = bounds.top - characterSize * SEAT_FEET_FRACTION
+            engine.sitAt(seatX, seatY)
+            dragActive = false
+            pressedWhileSitting = true
+            holdStartX = latestTouchX; holdStartY = latestTouchY
+            touchOffsetX = latestTouchX - engine.x; touchOffsetY = latestTouchY - engine.y
+            shimejiView?.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+        }.also { animationHandler.postDelayed(it, ICON_HOLD_MS) }
+    }
+
+    private fun cancelIconHold() {
+        pendingIconHold?.let(animationHandler::removeCallbacks)
+        pendingIconHold = null
+    }
+
+    private fun findAppIconBounds(engine: ShimejiPhysicsEngine, characterSize: Int): Rect? {
+        val homePackage = resolveDefaultHomePackage()
+        val roots = windows.asSequence()
+            .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+            .sortedByDescending { it.layer }
+            .mapNotNull { it.root }
+            .filter { root ->
+                val rootPackage = root.packageName?.toString()
+                rootPackage != packageName && (homePackage == null || rootPackage == homePackage)
+            }
+            .toList()
+            .ifEmpty { listOfNotNull(rootInActiveWindow).filter { it.packageName?.toString() != packageName } }
+
+        val probes = listOf(
+            (engine.x + characterSize * 0.5f).toInt() to (engine.y + characterSize * SEAT_FEET_FRACTION).toInt(),
+            (engine.x + characterSize * 0.5f).toInt() to (engine.y + characterSize * 0.5f).toInt(),
+            latestTouchX.toInt() to latestTouchY.toInt(),
+        )
+        for (root in roots) for ((x, y) in probes) {
+            findIconNodeAt(root, x, y)?.let { return it }
+        }
+        return null
+    }
+
+    private fun findIconNodeAt(node: AccessibilityNodeInfo, x: Int, y: Int): Rect? {
+        val bounds = Rect().also { node.getBoundsInScreen(it) }
+        if (!bounds.contains(x, y)) return null
+        for (index in node.childCount - 1 downTo 0) {
+            val child = node.getChild(index) ?: continue
+            findIconNodeAt(child, x, y)?.let { return it }
+        }
+        val label = node.contentDescription?.toString().orEmpty().ifBlank { node.text?.toString().orEmpty() }
+        val className = node.className?.toString().orEmpty()
+        val iconLikeClass = className.contains("BubbleText", true) || className.contains("Icon", true) || className.contains("ImageView", true)
+        val hasClickAction = node.actionList.any { it.id == AccessibilityNodeInfo.ACTION_CLICK }
+        val plausibleSize = bounds.width() in dp(24)..dp(260) && bounds.height() in dp(24)..dp(260)
+        return bounds.takeIf {
+            node.isVisibleToUser && node.isEnabled && label.isNotBlank() && plausibleSize &&
+                (node.isClickable || hasClickAction || iconLikeClass)
+        }
+    }
+
+    private fun resolveDefaultHomePackage(): String? {
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            packageManager.resolveActivity(intent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
+        } else {
+            @Suppress("DEPRECATION")
+            packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)
+        }
+        return info?.activityInfo?.packageName?.takeUnless { it == "android" || it == packageName }
+    }
+
+    private fun registerShakeSensor() {
+        if (shakeSensorRegistered) return
+        val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) ?: return
+        shakeSensorRegistered = sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME)
+    }
+
+    private fun unregisterShakeSensor() {
+        if (!shakeSensorRegistered || !::sensorManager.isInitialized) return
+        sensorManager.unregisterListener(this)
+        shakeSensorRegistered = false
+    }
+
+    override fun onSensorChanged(event: SensorEvent?) {
+        if (event?.sensor?.type != Sensor.TYPE_ACCELEROMETER || physics?.motion != ShimejiMotion.SITTING) return
+        val force = sqrt(event.values[0] * event.values[0] + event.values[1] * event.values[1] + event.values[2] * event.values[2]) / SensorManager.GRAVITY_EARTH
+        val now = SystemClock.uptimeMillis()
+        if (force >= SHAKE_THRESHOLD_G && now - lastShakeAt >= SHAKE_COOLDOWN_MS) {
+            lastShakeAt = now
+            unregisterShakeSensor()
+            physics?.releaseFromSeat()
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).roundToInt()
 
@@ -472,4 +649,5 @@ class OverlayAccessibilityService : AccessibilityService(), SharedPreferences.On
             else -> "#$trimmed"
         }
     }
+
 }

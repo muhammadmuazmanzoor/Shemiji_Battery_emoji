@@ -132,10 +132,11 @@ fun AccessibilityPermissionSheet(
                 )
                 PermissionBullet("Display your selected Shimeji and battery overlay consistently.")
                 PermissionBullet("Keep visual overlays aligned when the active app or screen changes.")
+                PermissionBullet("Identify an app icon under a held Shimeji so it can sit on that icon. Icon checks happen only on your device.")
                 PermissionBullet("Restore enabled customizations when the service reconnects.")
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "We do not collect messages, passwords, notifications, or personal screen content. You can turn this permission off at any time in device settings.",
+                    "We do not collect messages, passwords, notifications, or personal screen content. The accelerometer is active only while a Shimeji is sitting, so a shake can make it fall. You can turn this permission off at any time in device settings.",
                     color = Color(0xFF66666F),
                     fontFamily = InterFontFamily,
                     fontSize = 15.sp,
